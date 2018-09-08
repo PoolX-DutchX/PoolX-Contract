@@ -14,7 +14,7 @@ contract("Pool", ([owner, user1]) => {
   let pool, token, weth, dx;
   const initialClosingPriceNum = 1;
   const initialClosingPriceDen = 1;
-  
+
   beforeEach(async () => {
     token = await Token.new();
     weth = await EtherToken.deployed();
@@ -27,28 +27,27 @@ contract("Pool", ([owner, user1]) => {
       initialClosingPriceNum,
       initialClosingPriceDen
     );
-    // dx.setupDutchExchange(
-    //   TokenFRT _frtToken,
-    //   TokenOWL _owlToken,
-    //   address _auctioneer, 
-    //   address _ethToken,
-    //   PriceOracleInterface _ethUSDOracle,
-    //   uint _thresholdNewTokenPair,
-    //   uint _thresholdNewAuction
-    // )
   });
 
-  describe("#deposit", () => {
+  describe("test the contract", () => {
     it("should deposit ether in the contract", async () => {
+      await pool.deposit({ from: owner, value: 1e18 });
 
-        await pool.deposit({from: owner, value: 1e18})
-        // await pool.addToken()
-        console.log(await dx.thresholdNewTokenPair())
-        console.log('====================================');
-        console.log(await pool.getBalanceInUsd(1e18));
-        console.log('====================================');
-        const poolBalance = web3.eth.getBalance(pool.address)
-        poolBalance.should.be.bignumber.eq(1e18)
+      const poolBalance = web3.eth.getBalance(pool.address);
+      poolBalance.should.be.bignumber.eq(1e18);
+    });
+
+    it("should update the translate pool funds to USD ", async () => {
+      await pool.deposit({ from: owner, value: 1e18 });
+      const poolBalanceInUsd = await pool.getBalanceInUsd();
+      poolBalanceInUsd.should.be.bignumber.eq(1100e18);
+    });
+
+    it("should list the token", async () => {
+      await pool.deposit({ from: owner, value: 10e18 });
+
+      const poolBalanceInUsd = await pool.getBalanceInUsd();
+      poolBalanceInUsd.should.be.bignumber.eq(11000e18);
     });
   });
 });

@@ -23,12 +23,12 @@ contract Pool {
 
     function Pool (
         address _dx,
-        address _weth, 
-        address _token, 
-        uint _initialClosingPriceNum, 
+        address _weth,
+        address _token,
+        uint _initialClosingPriceNum,
         uint _initialClosingPriceDen
-    ) 
-        public 
+    )
+        public
     {
         require(address(_dx) != address(0));
         require(address(_weth) != address(0));
@@ -47,30 +47,18 @@ contract Pool {
         require(msg.value > 0);
 
         contributerAmount[msg.sender] += msg.value;
-        
-        if(getBalanceInUsd(this.balance) >= 10000){
-            buyWeth();
+
+        if(getBalanceInUsd() >= 10000 ether){
+            addToken();
         }
 
         emit Deposit(msg.sender, msg.value);
     }
 
-    function buyWeth () internal {
+    function addToken() internal {
         uint balance = address(this).balance;
         weth.deposit.value(balance);
 
-        // dx.addTokenPair(
-        //     address(weth),
-        //     address(token),
-        //     balance,
-        //     0,
-        //     initialClosingPriceNum,
-        //     initialClosingPriceDen
-        // );
-    }
-
-    function addToken () public {
-        uint balance = address(this).balance;
         dx.addTokenPair(
             address(weth),
             address(token),
@@ -85,15 +73,14 @@ contract Pool {
         dx = _dx;
     }
 
-    function getBalanceInUsd (uint balance) public view returns (uint) {
-      
+    function getBalanceInUsd() public view returns (uint) {
+
         // Get the price of ETH
         PriceOracleInterface priceOracle = PriceOracleInterface(dx.ethUSDOracle());
         uint etherUsdPrice = priceOracle.getUSDETHPrice();
-        // uint etherUsdPrice = 400 ether;
 
         // Return the price in USD:
-        return (balance * etherUsdPrice);
+        return (address(this).balance * etherUsdPrice);
     }
 
 

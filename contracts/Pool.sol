@@ -58,13 +58,13 @@ contract Pool {
 
         uint wethBalance = address(this).balance;
 
-        weth.deposit.value(balance)();
-        weth.approve(address(dx), balance);
+        weth.deposit.value(wethBalance)();
+        weth.approve(address(dx), wethBalance);
         // token.approve(address(dx), tokenBalance);
         // token.transfer(acct, startingGNO, { from: master }),
         // token.approve(dx.address, startingGNO, { from: acct }),
 
-        dx.deposit( address(weth), balance);
+        dx.deposit( address(weth), wethBalance);
         // dx.deposit( address(token), tokenBalance);
         dx.addTokenPair(
             address(weth),
@@ -92,7 +92,7 @@ contract Pool {
     }
 
     function () public payable {
-        deposit();
+        contribute();
     }
 
     event Deposit(

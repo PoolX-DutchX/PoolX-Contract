@@ -1,7 +1,7 @@
 const Pool = artifacts.require("./Pool.sol");
 const Token = artifacts.require("./TokenGNO.sol");
 const EtherToken = artifacts.require("./EtherToken.sol");
-const DutchExchangeProxy = artifacts.require("DutchExchangeProxy");
+const DutchExchangeProxy = artifacts.require("./DutchExchangeProxy.sol");
 
 const BigNumber = web3.BigNumber;
 
@@ -33,22 +33,21 @@ contract("Pool", ([owner, user1]) => {
 
   describe("test the contract", () => {
     it("should deposit ether in the contract", async () => {
-      await pool.deposit({ from: owner, value: 1e18 });
+      await pool.contribute({ from: owner, value: 1e18 });
 
-      const poolBalance = web3.eth.getBalance(pool.address);
+      const poolBalance = await web3.eth.getBalance(pool.address);
       poolBalance.should.be.bignumber.eq(1e18);
     });
 
     it("should update the translate pool funds to USD ", async () => {
-      await pool.deposit({ from: owner, value: 1e18 });
+      await pool.contribute({ from: owner, value: 1e18 });
+
       const poolBalanceInUsd = await pool.getBalanceInUsd();
       poolBalanceInUsd.should.be.bignumber.eq(1100e18);
     });
 
     it.only("should list the token", async () => {
-      await pool.deposit({ from: owner, value: 10e18 });
-      await pool.addToken({ from: owner });
-
+      await pool.contribute({ from: owner, value: 10e18 });
       
       const poolBalance = web3.eth.getBalance(pool.address);
 console.log('====================================');

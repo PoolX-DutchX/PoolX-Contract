@@ -9,8 +9,8 @@ import "@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInterface.sol";
 contract Pool {
     address public owner;
     mapping (address => uint) public contributerAmount;
-    uint initialClosingPriceNum;
-    uint initialClosingPriceDen;
+    uint public initialClosingPriceNum;
+    uint public initialClosingPriceDen;
 
     DutchExchange public dx;
     EtherToken public weth;
@@ -47,18 +47,27 @@ contract Pool {
         require(msg.value > 0);
 
         contributerAmount[msg.sender] += msg.value;
+        emit Deposit(msg.sender, msg.value);
 
         if(getBalanceInUsd() >= 10000 ether){
             addToken();
         }
-
-        emit Deposit(msg.sender, msg.value);
     }
+    
+    uint public balance;
 
     function addToken() internal {
-        uint balance = address(this).balance;
-        weth.deposit.value(balance);
 
+        balance = address(this).balance;
+
+        weth.deposit.value(balance)();
+        weth.approve(address(dx), balance);
+        // token.approve(address(dx), tokenBalance);
+        // token.transfer(acct, startingGNO, { from: master }),
+        // token.approve(dx.address, startingGNO, { from: acct }),
+
+        dx.deposit( address(weth), balance);
+        // dx.deposit( address(token), tokenBalance);
         dx.addTokenPair(
             address(weth),
             address(token),
@@ -67,6 +76,7 @@ contract Pool {
             initialClosingPriceNum,
             initialClosingPriceDen
         );
+        emit TokenPair(address(weth), address(token));
     }
 
     function updateDutchExchange (DutchExchange _dx) public onlyOwner {
@@ -83,9 +93,17 @@ contract Pool {
         return (address(this).balance * etherUsdPrice);
     }
 
+    function () public payable {
+        deposit();
+    }
 
     event Deposit(
          address sender,
          uint amount
+    );
+
+    event TokenPair(
+         address weth,
+         address token
     );
 }

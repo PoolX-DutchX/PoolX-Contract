@@ -1,5 +1,5 @@
 const Pool = artifacts.require("./Pool.sol");
-const Token = artifacts.require("./StandardToken.sol");
+const Token = artifacts.require("./TokenGNO.sol");
 const EtherToken = artifacts.require("./EtherToken.sol");
 const DutchExchangeProxy = artifacts.require("DutchExchangeProxy");
 
@@ -12,11 +12,11 @@ const should = require("chai")
 
 contract("Pool", ([owner, user1]) => {
   let pool, token, weth, dx;
-  const initialClosingPriceNum = 1;
+  const initialClosingPriceNum = 2;
   const initialClosingPriceDen = 1;
 
   beforeEach(async () => {
-    token = await Token.new();
+    token = await Token.new(100e18);
     weth = await EtherToken.deployed();
     dx = await DutchExchangeProxy.deployed();
 
@@ -27,6 +27,8 @@ contract("Pool", ([owner, user1]) => {
       initialClosingPriceNum,
       initialClosingPriceDen
     );
+
+    await token.transfer(pool.address, 10e18);
   });
 
   describe("test the contract", () => {
@@ -43,11 +45,20 @@ contract("Pool", ([owner, user1]) => {
       poolBalanceInUsd.should.be.bignumber.eq(1100e18);
     });
 
-    it("should list the token", async () => {
+    it.only("should list the token", async () => {
       await pool.deposit({ from: owner, value: 10e18 });
+      await pool.addToken({ from: owner });
+
+      
+      const poolBalance = web3.eth.getBalance(pool.address);
+console.log('====================================');
+console.log(poolBalance);
+console.log('====================================');
+      console.log(await weth.balanceOf(pool.address))
+      // await pool.test({ from: owner});
+      // await pool.testdeposit({ from: owner });
 
       const poolBalanceInUsd = await pool.getBalanceInUsd();
-      poolBalanceInUsd.should.be.bignumber.eq(11000e18);
     });
   });
 });

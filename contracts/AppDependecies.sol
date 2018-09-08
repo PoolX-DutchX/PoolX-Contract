@@ -8,6 +8,6 @@ pragma solidity 0.4.21;
 //  package
 
 import "@gnosis.pm/dx-contracts/contracts/DxDevDependencies.sol";
-import "@gnosis.pm/util-contracts/contracts/StandardToken.sol";
+import "@gnosis.pm/gno-token/contracts/TokenGNO.sol";
 
 contract AppDependencies {}

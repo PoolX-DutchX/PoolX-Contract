@@ -46,7 +46,6 @@ contract Pool {
     }
 
 
-
     function contribute() public payable {
         require(!finished);
 

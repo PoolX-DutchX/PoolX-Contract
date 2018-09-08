@@ -43,26 +43,33 @@ contract Pool {
         owner = msg.sender;
     }
 
-    function deposit () payable public {
+    function contribute() public payable {
         require(msg.value > 0);
 
         contributerAmount[msg.sender] += msg.value;
 
         if(getBalanceInUsd() >= 10000 ether){
-            addToken();
+            setUpForDutchX();
         }
 
         emit Deposit(msg.sender, msg.value);
     }
 
-    function addToken() internal {
+    function setUpForDutchX() internal {
         uint balance = address(this).balance;
+        //get weth
         weth.deposit.value(balance);
+
+        uint wethBalance = weth.balanceOf(address(this));
+
+        weth.approve(dx, wethBalance);
+
+        wethBalance = dx.deposit(weth, wethBalance);
 
         dx.addTokenPair(
             address(weth),
             address(token),
-            balance,
+            wethBalance,
             0,
             initialClosingPriceNum,
             initialClosingPriceDen

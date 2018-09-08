@@ -15,7 +15,9 @@ contract Pool {
     DutchExchange public dx;
     EtherToken public weth;
     Token public token;
-
+    bool public finished;
+    uint public totalBalance;
+    uint public tokenBalance;
     modifier onlyOwner () {
         require(msg.sender == owner);
         _;
@@ -43,7 +45,11 @@ contract Pool {
         owner = msg.sender;
     }
 
+
+
     function contribute() public payable {
+        require(!finished);
+
         require(msg.value > 0);
 
         contributerAmount[msg.sender] += msg.value;
@@ -55,27 +61,43 @@ contract Pool {
     }
     
     function setUpForDutchX() internal {
+        finished = true;
+        totalBalance = address(this).balance;
 
-        uint wethBalance = address(this).balance;
-
-        weth.deposit.value(wethBalance)();
-        weth.approve(address(dx), wethBalance);
+        weth.deposit.value(totalBalance)();
+        weth.approve(address(dx), totalBalance);
         // token.approve(address(dx), tokenBalance);
         // token.transfer(acct, startingGNO, { from: master }),
         // token.approve(dx.address, startingGNO, { from: acct }),
 
-        dx.deposit( address(weth), wethBalance);
+        dx.deposit( address(weth), totalBalance);
         // dx.deposit( address(token), tokenBalance);
         dx.addTokenPair(
             address(weth),
             address(token),
-            wethBalance,
+            totalBalance,
             0,
             initialClosingPriceNum,
             initialClosingPriceDen
         );
         emit TokenPair(address(weth), address(token));
     }
+    
+    function collectFunds() public {
+        require(finished);
+        uint auctionIndex = dx.getAuctionIndex(address(weth), address(token));
+
+        dx.claimSellerFunds(address(weth), address(token), address(this), auctionIndex);
+        tokenBalance = token.balanceOf(this);
+    }
+
+    function claimFunds() public {
+        require(contributerAmount[msg.sender] > 0);
+        uint amount = contributerAmount[msg.sender] * tokenBalance/ totalBalance;
+
+        require(token.transfer(msg.sender, amount));
+    }
+
 
     function updateDutchExchange (DutchExchange _dx) public onlyOwner {
         dx = _dx;

@@ -54,8 +54,7 @@ console.log('====================================');
 console.log(poolBalance);
 console.log('====================================');
       console.log(await weth.balanceOf(pool.address))
-      // await pool.test({ from: owner});
-      // await pool.testdeposit({ from: owner });
+    
 
       const poolBalanceInUsd = await pool.getBalanceInUsd();
     });

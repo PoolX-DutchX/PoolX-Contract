@@ -5,8 +5,11 @@ import "@gnosis.pm/util-contracts/contracts/EtherToken.sol";
 
 import "@gnosis.pm/dx-contracts/contracts/DutchExchange.sol";
 import "@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInterface.sol";
+import "zeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract Pool {
+    using SafeMath for uint256;
+
     address public owner;
     mapping (address => uint) public contributerAmount;
     uint public initialClosingPriceNum;
@@ -16,8 +19,11 @@ contract Pool {
     EtherToken public weth;
     Token public token;
     bool public finished;
-    uint public totalBalance;
+    bool public canClaim;
+
+    uint public ethBalance;
     uint public tokenBalance;
+
     modifier onlyOwner () {
         require(msg.sender == owner);
         _;
@@ -48,33 +54,32 @@ contract Pool {
 
     function contribute() public payable {
         require(!finished);
-
         require(msg.value > 0);
 
         contributerAmount[msg.sender] += msg.value;
         emit Deposit(msg.sender, msg.value);
 
         if(getBalanceInUsd() >= 10000 ether){
-            setUpForDutchX();
+            addTokenPair();
         }
     }
     
-    function setUpForDutchX() internal {
+    function addTokenPair() internal {
         finished = true;
-        totalBalance = address(this).balance;
+        ethBalance = address(this).balance;
 
-        weth.deposit.value(totalBalance)();
-        weth.approve(address(dx), totalBalance);
+        weth.deposit.value(ethBalance)();
+        weth.approve(address(dx), ethBalance);
         // token.approve(address(dx), tokenBalance);
         // token.transfer(acct, startingGNO, { from: master }),
         // token.approve(dx.address, startingGNO, { from: acct }),
 
-        dx.deposit( address(weth), totalBalance);
+        dx.deposit( address(weth), ethBalance);
         // dx.deposit( address(token), tokenBalance);
         dx.addTokenPair(
             address(weth),
             address(token),
-            totalBalance,
+            ethBalance,
             0,
             initialClosingPriceNum,
             initialClosingPriceDen
@@ -84,15 +89,23 @@ contract Pool {
     
     function collectFunds() public {
         require(finished);
+        require(!canClaim);
+
+        canClaim = true;
         uint auctionIndex = dx.getAuctionIndex(address(weth), address(token));
 
         dx.claimSellerFunds(address(weth), address(token), address(this), auctionIndex);
         tokenBalance = token.balanceOf(this);
     }
 
+
     function claimFunds() public {
+        require(canClaim);
         require(contributerAmount[msg.sender] > 0);
-        uint amount = contributerAmount[msg.sender] * tokenBalance/ totalBalance;
+        
+        uint amount = contributerAmount[msg.sender].mul(tokenBalance).div(ethBalance);
+        contributerAmount[msg.sender] = 0;
+
 
         require(token.transfer(msg.sender, amount));
     }

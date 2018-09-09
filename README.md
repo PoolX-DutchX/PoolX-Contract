@@ -19,3 +19,7 @@ Address on rinkeby: [0x98a9e3172cb5cf27f67fcb09fdbe5fc04715b65c](https://rinkeby
 ## 4. Telegram interface
 
 See https://github.com/EthBerlinDutchX/telebotPoolX
+
+## 5. (Short) presentation
+
+See https://docs.google.com/presentation/d/1KIK1MMKMv2lWCZjtSQzw-0y-HL2DleRwtg2zgmuyRLQ

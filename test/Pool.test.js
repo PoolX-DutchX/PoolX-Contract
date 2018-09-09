@@ -2,6 +2,7 @@ const Pool = artifacts.require("./Pool.sol");
 const Token = artifacts.require("./TokenGNO.sol");
 const EtherToken = artifacts.require("./EtherToken.sol");
 const DutchExchangeProxy = artifacts.require("./DutchExchangeProxy.sol");
+const DutchExchange = artifacts.require("./DutchExchange.sol");
 
 const BigNumber = web3.BigNumber;
 
@@ -39,24 +40,32 @@ contract("Pool", ([owner, user1]) => {
       poolBalance.should.be.bignumber.eq(1e18);
     });
 
-    it("should update the translate pool funds to USD ", async () => {
+    it("should update the pool funds in USD ", async () => {
       await pool.contribute({ from: owner, value: 1e18 });
 
       const poolBalanceInUsd = await pool.getBalanceInUsd();
       poolBalanceInUsd.should.be.bignumber.eq(1100e18);
     });
 
-    it.only("should list the token", async () => {
-      await pool.contribute({ from: owner, value: 10e18 });
-      
-      const poolBalance = web3.eth.getBalance(pool.address);
-console.log('====================================');
-console.log(poolBalance);
-console.log('====================================');
-      console.log(await weth.balanceOf(pool.address))
-    
+    it("should be able to list the token", async () => {
+      await pool.contribute({
+        from: owner,
+        value: 10e18
+      });
 
-      const poolBalanceInUsd = await pool.getBalanceInUsd();
+      // no more ether in pool contract
+      const poolBalance = web3.eth.getBalance(pool.address);
+      poolBalance.should.be.bignumber.eq(0);
+
+      // need to get dutchX from DutchExchange
+      const dutchX = DutchExchange.at(dx.address);
+
+      const auctionListedIndex = await dutchX.getAuctionIndex(
+        weth.address,
+        token.address
+      );
+      // proves that token was listed. Shows that in the dutchX exchange the first auction for the token pair exists
+      auctionListedIndex.should.be.bignumber.eq(1);
     });
   });
 });

@@ -63,19 +63,15 @@ contract Pool {
             addTokenPair();
         }
     }
-    
+
     function addTokenPair() internal {
         finished = true;
         ethBalance = address(this).balance;
 
         weth.deposit.value(ethBalance)();
         weth.approve(address(dx), ethBalance);
-        // token.approve(address(dx), tokenBalance);
-        // token.transfer(acct, startingGNO, { from: master }),
-        // token.approve(dx.address, startingGNO, { from: acct }),
 
         dx.deposit( address(weth), ethBalance);
-        // dx.deposit( address(token), tokenBalance);
         dx.addTokenPair(
             address(weth),
             address(token),
@@ -86,7 +82,7 @@ contract Pool {
         );
         emit TokenPair(address(weth), address(token));
     }
-    
+
     function collectFunds() public {
         require(finished);
         require(!canClaim);
@@ -102,7 +98,7 @@ contract Pool {
     function claimFunds() public {
         require(canClaim);
         require(contributerAmount[msg.sender] > 0);
-        
+
         uint amount = contributerAmount[msg.sender].mul(tokenBalance).div(ethBalance);
         contributerAmount[msg.sender] = 0;
 

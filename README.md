@@ -1,4 +1,4 @@
-# pool-dutchx
+# Pooling-Contract
 
 
 ## 1. What is Pool?

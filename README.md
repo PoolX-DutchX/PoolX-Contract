@@ -1,4 +1,4 @@
-# Pooling-Contract
+# PoolX-Contract
 
 
 ## 1. What is Pool?

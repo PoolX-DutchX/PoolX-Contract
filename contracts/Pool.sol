@@ -120,6 +120,8 @@ contract Pool {
         contributerAmount[msg.sender] = 0;
 
         require(token.transfer(msg.sender, amount));
+        emit Claim(msg.sender, amount);
+
     }
 
     /**
@@ -133,6 +135,7 @@ contract Pool {
 
         // Return the price in USD:
         return (address(this).balance * etherUsdPrice);
+        
     }
 
     function () public payable {
@@ -147,5 +150,10 @@ contract Pool {
     event TokenPair(
          address weth,
          address token
+    );
+
+    event Claim(
+         address sender,
+         uint amount
     );
 }

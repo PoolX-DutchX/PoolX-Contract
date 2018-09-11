@@ -61,12 +61,17 @@ contract Pool {
         stage = Stages.Contribute;
     }
 
+    /**
+     * @dev Contibute to a Pool with ether. The stage is finished when ether worth 10000$ 
+     *      is collected and a dx token pair (weth/new token is created).
+     */
     function contribute() public payable atStage(Stages.Contribute)
     {
         require(msg.value > 0);
 
         contributerAmount[msg.sender] += msg.value;
         emit Deposit(msg.sender, msg.value);
+
 
         if(getBalanceInUsd() >= 10000 ether){
             addTokenPair();
@@ -92,27 +97,34 @@ contract Pool {
         emit TokenPair(address(weth), address(token));
     }
 
+    /**
+     * @dev Collects the seller funds to the Pool. When succeeds alows to collect share. 
+     */
     function collectFunds() public atStage(Stages.Collect) {
 
         stage = Stages.Claim;
         uint auctionIndex = dx.getAuctionIndex(address(weth), address(token));
-
+        
+        //should revert if not finsihed?
         dx.claimSellerFunds(address(weth), address(token), address(this), auctionIndex);
         tokenBalance = token.balanceOf(this);
     }
 
-
+    /**
+     * @dev Each contributer can claim there token share with this function.
+     */
     function claimFunds() public atStage(Stages.Claim){
         require(contributerAmount[msg.sender] > 0);
 
         uint amount = contributerAmount[msg.sender].mul(tokenBalance).div(ethBalance);
         contributerAmount[msg.sender] = 0;
 
-
         require(token.transfer(msg.sender, amount));
     }
 
-
+    /**
+     * @dev Each contributer can claim there token share with this function.
+     */
     function getBalanceInUsd() public view returns (uint) {
 
         // Get the price of ETH

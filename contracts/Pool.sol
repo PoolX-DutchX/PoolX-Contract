@@ -10,7 +10,6 @@ import "zeppelin-solidity/contracts/math/SafeMath.sol";
 contract Pool {
     using SafeMath for uint256;
 
-    address public owner;
     mapping (address => uint) public contributerAmount;
     uint public initialClosingPriceNum;
     uint public initialClosingPriceDen;
@@ -29,11 +28,6 @@ contract Pool {
         Contribute,
         Collect,
         Claim
-    }
-
-    modifier onlyOwner () {
-        require(msg.sender == owner);
-        _;
     }
 
     modifier atStage(Stages _stage) {
@@ -64,13 +58,7 @@ contract Pool {
         token = Token(_token);
         initialClosingPriceNum = _initialClosingPriceNum;
         initialClosingPriceDen = _initialClosingPriceDen;
-        owner = msg.sender;
         stage = Stages.Contribute;
-    }
-
-    //todo remove?
-    function updateDutchExchange (DutchExchange _dx) public onlyOwner {
-        dx = _dx;
     }
 
     function contribute() public payable atStage(Stages.Contribute)
@@ -124,8 +112,6 @@ contract Pool {
         require(token.transfer(msg.sender, amount));
     }
 
-
-    
 
     function getBalanceInUsd() public view returns (uint) {
 

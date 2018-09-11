@@ -3,7 +3,7 @@ const Token = artifacts.require("./TokenGNO.sol");
 const EtherToken = artifacts.require("./EtherToken.sol");
 const DutchExchangeProxy = artifacts.require("./DutchExchangeProxy.sol");
 const DutchExchange = artifacts.require("./DutchExchange.sol");
-
+const PoolXCloneFactory = artifacts.require("./PoolXCloneFactory.sol");
 const BigNumber = web3.BigNumber;
 
 const should = require("chai")
@@ -12,7 +12,7 @@ const should = require("chai")
   .should();
 
 contract("Pool", ([owner, user1]) => {
-  let pool, token, weth, dx;
+  let pool, clonedPool, poolCloneFactory, token, weth, dx;
   const initialClosingPriceNum = 2;
   const initialClosingPriceDen = 1;
 
@@ -20,8 +20,8 @@ contract("Pool", ([owner, user1]) => {
     token = await Token.new(100e18);
     weth = await EtherToken.deployed();
     dx = await DutchExchangeProxy.deployed();
-
-    pool = await Pool.new(
+    pool = await Pool.new();
+    await pool.init(
       dx.address,
       weth.address,
       token.address,
@@ -29,7 +29,18 @@ contract("Pool", ([owner, user1]) => {
       initialClosingPriceDen
     );
 
-    await token.transfer(pool.address, 10e18);
+    poolCloneFactory = await PoolXCloneFactory.deployed(pool.address);
+    
+    clonedPool = await poolCloneFactory.createPool(
+      dx.address,
+      weth.address,
+      token.address,
+      initialClosingPriceNum,
+      initialClosingPriceDen
+    ).then(tx => Pool.at(tx.logs[0].args.newPoolAddress))
+   
+
+    // await token.transfer(pool.address, 10e18);
   });
 
   describe("test the contract", () => {

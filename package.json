@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@gnosis.pm/dx-contracts": "^1.0.5",
+    "@optionality.io/clone-factory": "^0.1.6",
     "chai": "^4.1.2",
     "chai-as-promised": "^7.1.1",
     "chai-bignumber": "^2.0.2",

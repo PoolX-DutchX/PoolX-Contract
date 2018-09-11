@@ -18,18 +18,33 @@ contract Pool {
     DutchExchange public dx;
     EtherToken public weth;
     Token public token;
-    bool public finished;
-    bool public canClaim;
+
 
     uint public ethBalance;
     uint public tokenBalance;
+    Stages public stage = Stages.Initilize;
+
+    enum Stages {
+        Initilize,
+        Contribute,
+        Collect,
+        Claim
+    }
 
     modifier onlyOwner () {
         require(msg.sender == owner);
         _;
     }
 
-    function Pool (
+    modifier atStage(Stages _stage) {
+        require(
+            stage == _stage,
+            "Function cannot be called at this time."
+        );
+        _;
+    }
+
+    function init (
         address _dx,
         address _weth,
         address _token,
@@ -37,6 +52,7 @@ contract Pool {
         uint _initialClosingPriceDen
     )
         public
+        atStage(Stages.Initilize)
     {
         require(address(_dx) != address(0));
         require(address(_weth) != address(0));
@@ -49,11 +65,16 @@ contract Pool {
         initialClosingPriceNum = _initialClosingPriceNum;
         initialClosingPriceDen = _initialClosingPriceDen;
         owner = msg.sender;
+        stage = Stages.Contribute;
     }
 
+    //todo remove?
+    function updateDutchExchange (DutchExchange _dx) public onlyOwner {
+        dx = _dx;
+    }
 
-    function contribute() public payable {
-        require(!finished);
+    function contribute() public payable atStage(Stages.Contribute)
+    {
         require(msg.value > 0);
 
         contributerAmount[msg.sender] += msg.value;
@@ -65,7 +86,7 @@ contract Pool {
     }
 
     function addTokenPair() internal {
-        finished = true;
+        stage = Stages.Collect;
         ethBalance = address(this).balance;
 
         weth.deposit.value(ethBalance)();
@@ -83,11 +104,9 @@ contract Pool {
         emit TokenPair(address(weth), address(token));
     }
 
-    function collectFunds() public {
-        require(finished);
-        require(!canClaim);
+    function collectFunds() public atStage(Stages.Collect) {
 
-        canClaim = true;
+        stage = Stages.Claim;
         uint auctionIndex = dx.getAuctionIndex(address(weth), address(token));
 
         dx.claimSellerFunds(address(weth), address(token), address(this), auctionIndex);
@@ -95,8 +114,7 @@ contract Pool {
     }
 
 
-    function claimFunds() public {
-        require(canClaim);
+    function claimFunds() public atStage(Stages.Claim){
         require(contributerAmount[msg.sender] > 0);
 
         uint amount = contributerAmount[msg.sender].mul(tokenBalance).div(ethBalance);
@@ -107,9 +125,7 @@ contract Pool {
     }
 
 
-    function updateDutchExchange (DutchExchange _dx) public onlyOwner {
-        dx = _dx;
-    }
+    
 
     function getBalanceInUsd() public view returns (uint) {
 

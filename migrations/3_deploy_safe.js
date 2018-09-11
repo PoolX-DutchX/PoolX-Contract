@@ -7,6 +7,8 @@ const Pool = artifacts.require("Pool");
 const DutchExchangeProxy = artifacts.require("DutchExchangeProxy");
 const EtherToken = artifacts.require("EtherToken");
 const StandardToken = artifacts.require("StandardToken");
+const PoolXCloneFactory = artifacts.require("./PoolXCloneFactory.sol");
+
 let dutchExchangeProxy;
 let etherToken;
 let token;
@@ -32,6 +34,11 @@ module.exports = function(deployer, network, accounts) {
       token = _token;
 
       return deployer.deploy(Pool, dutchExchangeProxy.address, etherToken.address, _token.address, 1, 1);
+    })
+    .then(_pool => {
+      pool = _pool;
+      
+      return deployer.deploy(PoolXCloneFactory, pool.address);
     })
 
   if (network === "development") {

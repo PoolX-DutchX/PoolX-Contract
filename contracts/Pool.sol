@@ -123,7 +123,7 @@ contract Pool {
     }
 
     /**
-     * @dev Each contributer can claim there token share with this function.
+     * @dev Get the eth value of contract in USD.
      */
     function getBalanceInUsd() public view returns (uint) {
 

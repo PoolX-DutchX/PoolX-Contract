@@ -62,7 +62,7 @@ contract Pool {
         dx = DutchExchange(_dx);
         require(dx.getAuctionIndex(_weth, _token) == 0);
 
-        //dx.ethToken
+        //This should always be, we change it later dx.ethToken()
         weth = IEtherToken(_weth);
 
         //approvedTokens[tokenAddress] //token already approved
@@ -88,6 +88,7 @@ contract Pool {
         require(_initialClosingPriceDen < 10 ** 18);
         require(_weth != _token);
     }
+
     /**
      * @dev Contibute to a Pool with ether. The stage is finished when ether worth 10000$ 
      *      is collected and a dx token pair (weth/new token is created).
@@ -97,7 +98,7 @@ contract Pool {
         require(msg.value > 0);
 
         contributerAmount[msg.sender] += msg.value;
-        emit Deposit(msg.sender, msg.value);
+        emit Contribute(msg.sender, msg.value);
 
 
         if(getBalanceInUsd() >= dx.thresholdNewTokenPair()){
@@ -105,10 +106,18 @@ contract Pool {
         }
     }
 
+    // //thresholdNewAuction
+    // //todo this will also be done for dx.postSellOrder
+    // function addTokenPair() internal {
+    //     if(getBalanceInUsd() >= dx.thresholdNewAuction()) {
+    //         // dx.postSellOrder()
+    //     }
+    // }
+
     function addTokenPair() internal {
         stage = Stages.Collect;
         ethBalance = address(this).balance;
-
+//this not save?
         weth.deposit.value(ethBalance)();
         weth.approve(address(dx), ethBalance);
 
@@ -170,7 +179,7 @@ contract Pool {
         contribute();
     }
 
-    event Deposit(
+    event Contribute(
          address sender,
          uint amount
     );

@@ -42,7 +42,7 @@ contract("Pool", ([owner, user1]) => {
 
     // await token.transfer(pool.address, 10e18);
   });
-
+  
   describe("#contribute", () => {
     it("should deposit ether in the contract", async () => {
       await pool.contribute({ from: owner, value: 1e18 });
@@ -78,5 +78,9 @@ contract("Pool", ([owner, user1]) => {
       // proves that token was listed. Shows that in the dutchX exchange the first auction for the token pair exists
       auctionListedIndex.should.be.bignumber.eq(1);
     });
+  });
+  describe("#collectFunds", () => {
+  });
+  describe("#claimFunds", () => {
   });
 });

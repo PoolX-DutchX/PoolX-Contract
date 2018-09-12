@@ -43,7 +43,7 @@ contract("Pool", ([owner, user1]) => {
     // await token.transfer(pool.address, 10e18);
   });
 
-  describe("test the contract", () => {
+  describe("#contribute", () => {
     it("should deposit ether in the contract", async () => {
       await pool.contribute({ from: owner, value: 1e18 });
 
@@ -59,7 +59,7 @@ contract("Pool", ([owner, user1]) => {
     });
 
     it("should be able to list the token", async () => {
-      await pool.contribute({
+      await clonedPool.contribute({
         from: owner,
         value: 10e18
       });

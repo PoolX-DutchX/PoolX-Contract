@@ -1,11 +1,15 @@
 pragma solidity ^0.4.21;
 
-import "@gnosis.pm/util-contracts/contracts/Token.sol";
-import "@gnosis.pm/util-contracts/contracts/EtherToken.sol";
+// import "@gnosis.pm/util-contracts/contracts/Token.sol";
+// import "@gnosis.pm/util-contracts/contracts/EtherToken.sol";
+import "./IEtherToken.sol";
 
 import "@gnosis.pm/dx-contracts/contracts/DutchExchange.sol";
 import "@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInterface.sol";
-import "zeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+
+
 
 contract Pool {
     using SafeMath for uint256;
@@ -15,8 +19,8 @@ contract Pool {
     uint public initialClosingPriceDen;
 
     DutchExchange public dx;
-    EtherToken public weth;
-    Token public token;
+    IEtherToken public weth;
+    ERC20 public token;
 
 
     uint public ethBalance;
@@ -48,19 +52,42 @@ contract Pool {
         public
         atStage(Stages.Initilize)
     {
-        require(address(_dx) != address(0));
-        require(address(_weth) != address(0));
-        require(address(_token) != address(0));
-        require(_initialClosingPriceDen != 0);
-
+        _addTokenPairRequirements(
+            _dx,
+            _weth,
+            _token,
+            _initialClosingPriceNum,
+            _initialClosingPriceDen
+        );
         dx = DutchExchange(_dx);
-        weth = EtherToken(_weth);
-        token = Token(_token);
+        require(dx.getAuctionIndex(_weth, _token) == 0);
+
+        //dx.ethToken
+        weth = IEtherToken(_weth);
+
+        //approvedTokens[tokenAddress] //token already approved
+        token = ERC20(_token);
         initialClosingPriceNum = _initialClosingPriceNum;
         initialClosingPriceDen = _initialClosingPriceDen;
         stage = Stages.Contribute;
     }
 
+    function _addTokenPairRequirements(
+        address _dx,
+        address _weth,
+        address _token,
+        uint _initialClosingPriceNum,
+        uint _initialClosingPriceDen
+    ) internal {
+        require(address(_dx) != address(0));
+        require(address(_weth) != address(0));
+        require(address(_token) != address(0));
+        require(_initialClosingPriceNum != 0);
+        require(_initialClosingPriceDen != 0);
+        require(_initialClosingPriceNum < 10 ** 18);
+        require(_initialClosingPriceDen < 10 ** 18);
+        require(_weth != _token);
+    }
     /**
      * @dev Contibute to a Pool with ether. The stage is finished when ether worth 10000$ 
      *      is collected and a dx token pair (weth/new token is created).
@@ -73,7 +100,7 @@ contract Pool {
         emit Deposit(msg.sender, msg.value);
 
 
-        if(getBalanceInUsd() >= 10000 ether){
+        if(getBalanceInUsd() >= dx.thresholdNewTokenPair()){
             addTokenPair();
         }
     }
@@ -107,7 +134,8 @@ contract Pool {
         
         //should revert if not finsihed?
         dx.claimSellerFunds(address(weth), address(token), address(this), auctionIndex);
-        tokenBalance = token.balanceOf(this);
+        tokenBalance = dx.balances(address(token),address(this));
+        dx.withdraw(address(token),tokenBalance);
     }
 
     /**

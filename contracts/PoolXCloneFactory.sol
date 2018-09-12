@@ -2,7 +2,7 @@ pragma solidity ^0.4.21;
 
 import "./Pool.sol";
 import "@optionality.io/clone-factory/contracts/CloneFactory.sol";
-import "zeppelin-solidity/contracts/ownership/Ownable.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
 
 contract PoolXCloneFactory is Ownable, CloneFactory {
@@ -34,7 +34,7 @@ contract PoolXCloneFactory is Ownable, CloneFactory {
         _initialClosingPriceNum,
         _initialClosingPriceDen
     );
-    PoolCreated(clone);
+    emit PoolCreated(address(clone));
   }
 
 }

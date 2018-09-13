@@ -90,7 +90,7 @@ contract("Pool", ([owner, user1]) => {
       });
     });
 
-    it.only("should be able to list the token", async () => {
+    it("should be able to list the token", async () => {
       const dutchX = DutchExchange.at(dx.address);
 
       let auctionListedIndex = await dutchX.getAuctionIndex(

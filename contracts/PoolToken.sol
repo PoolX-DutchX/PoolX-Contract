@@ -152,13 +152,7 @@ contract PoolToken {
 
         fundedValueUSD = fundedValueETH.mul(ethUSDPrice);
     }
-    // //thresholdNewAuction
-    // //todo this will also be done for dx.postSellOrder
-    // function addTokenPair() internal {
-    //     if(getBalanceInUsd() >= dx.thresholdNewAuction()) {
-    //         // dx.postSellOrder()
-    //     }
-    // }
+
 
     function addTokenPair() internal {
         stage = Stages.Collect;

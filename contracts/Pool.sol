@@ -139,12 +139,12 @@ contract Pool {
     function collectFunds() public atStage(Stages.Collect) {
 
         stage = Stages.Claim;
-        uint auctionIndex = dx.getAuctionIndex(address(weth), address(token));
+        // uint auctionIndex = dx.getAuctionIndex(address(weth), address(token));
         
         //should revert if not finsihed?
-        dx.claimSellerFunds(address(weth), address(token), address(this), auctionIndex);
+        dx.claimSellerFunds(address(weth), address(token), address(this), 1);
         tokenBalance = dx.balances(address(token),address(this));
-        dx.withdraw(address(token),tokenBalance);
+        dx.withdraw(address(token), tokenBalance);
     }
 
     /**

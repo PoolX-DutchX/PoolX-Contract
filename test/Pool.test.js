@@ -6,6 +6,9 @@ const DutchExchange = artifacts.require("./DutchExchange.sol");
 const PoolXCloneFactory = artifacts.require("./PoolXCloneFactory.sol");
 const BigNumber = web3.BigNumber;
 
+
+const {increaseTime, increaseTimeTo, duration} = require("openzeppelin-solidity/test/helpers/increaseTime");
+
 const should = require("chai")
   .use(require("chai-as-promised"))
   .use(require("chai-bignumber")(BigNumber))
@@ -80,7 +83,57 @@ contract("Pool", ([owner, user1]) => {
     });
   });
   describe("#collectFunds", () => {
+    beforeEach(async () => {
+      await clonedPool.contribute({
+        from: owner,
+        value: 10e18
+      });
+    });
+
+    it.only("should be able to list the token", async () => {
+      const dutchX = DutchExchange.at(dx.address);
+
+      let auctionListedIndex = await dutchX.getAuctionIndex(
+        weth.address,
+        token.address
+      );
+      const auctionStart = (await dutchX.getAuctionStart.call(weth.address, token.address)).toNumber()
+      // const auctionStarts = await dutchX.auctionStarts(weth.address, token.address);
+ 
+      
+      // await increaseTimeTo(auctionStarts);
+      await increaseTimeTo(auctionStart+ duration.hours(4));
+
+      // // await increaseTime(duration.hours(1));
+      await token.approve(dutchX.address, 100e18);
+      await dutchX.deposit(token.address, 100e18);
+      const postBuyOrder = await dutchX.postBuyOrder(
+            weth.address,
+            token.address,
+            auctionListedIndex,
+            100e18
+      );
+      auctionListedIndex = await dutchX.getAuctionIndex(
+        weth.address,
+        token.address
+      );
+
+      let ownerBalance = await token.balanceOf(owner);
+      ownerBalance.should.be.bignumber.eq(0);
+      await clonedPool.collectFunds();
+      await clonedPool.claimFunds();
+      ownerBalance = await token.balanceOf(owner);
+      console.log('====================================');
+      console.log(ownerBalance);
+      console.log('====================================');
+      ownerBalance = await token.balanceOf(clonedPool.address);
+      console.log('====================================');
+      console.log(ownerBalance);
+      console.log('====================================');
+    });
+
   });
+
   describe("#claimFunds", () => {
   });
 });

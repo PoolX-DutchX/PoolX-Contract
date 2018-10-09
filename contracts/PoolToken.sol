@@ -10,7 +10,6 @@ import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
 
-
 contract PoolToken {
     using SafeMath for uint256;
 
@@ -21,7 +20,7 @@ contract PoolToken {
     uint public initialClosingPriceDen;
 
     DutchExchange public dx;
-    ERC20 public token1;
+    address public token1;
     ERC20 public token2;
 
 
@@ -29,7 +28,7 @@ contract PoolToken {
     uint public token2Balance;
     uint public newToken1Balance;
     uint public newToken2Balance;
-
+    bool public wethAuction = true;
     Stages public stage = Stages.Initilize;
 
     enum Stages {
@@ -65,13 +64,23 @@ contract PoolToken {
             _initialClosingPriceDen
         );
         dx = DutchExchange(_dx);
+        
         require(dx.getAuctionIndex(_token1, _token2) == 0);
 
-        //This should always be, we change it later dx.ethToken()
-        token1 = ERC20(_token1);
+        if(dx.ethToken() == _token1){
+            token1 = ERC20(_token1);
+            token2 = ERC20(_token2);
 
-        //approvedTokens[tokenAddress] //token already approved
-        token2 = ERC20(_token2);
+        } else if (dx.ethToken() == _token2) {
+            token1 = ERC20(_token2);
+            token2 = ERC20(_token1);
+        } else {
+            token1 = ERC20(_token1);
+            token2 = ERC20(_token2);
+            wethAuction = false;
+
+        }
+
         initialClosingPriceNum = _initialClosingPriceNum;
         initialClosingPriceDen = _initialClosingPriceDen;
         stage = Stages.Contribute;
@@ -98,24 +107,58 @@ contract PoolToken {
      * @dev Contibute to a Pool with ether. The stage is finished when ether worth 10000$ 
      *      is collected and a dx token pair (token1/new token is created).
      */
-    function contribute(uint contributeToken1, uint contributeToken2) public atStage(Stages.Contribute)
+    function contribute(uint contributeToken1, uint contributeToken2) public payable atStage(Stages.Contribute)
     {
+        if(!wethAuction){
+            require(msg.value == 0);
+        }
+
         require(token1.transferFrom(address(msg.sender), address(this), contributeToken1));
         require(token2.transferFrom(address(msg.sender), address(this), contributeToken2));
 
-        contributerAmountToken1[msg.sender] = contributerAmountToken1[msg.sender].add(contributeToken1);
+        contributerAmountToken1[msg.sender] = contributerAmountToken1[msg.sender].add(contributeToken1).add(msg.value);
         contributerAmountToken2[msg.sender] = contributerAmountToken2[msg.sender].add(contributeToken2);
         emit Contribute(msg.sender, address(token1), contributeToken1);
         emit Contribute(msg.sender, address(token2), contributeToken2);
-        token1Balance = token1Balance.add(contributeToken1);
+        token1Balance = token1Balance.add(contributeToken1).add(msg.value);
         token2Balance = token2Balance.add(contributeToken2);
-        address ethTokenMem = dx.ethToken();
-        uint fundedValueUSD = _calculateFundedValueTokenToken(token1, token2, token1Balance, token2Balance, ethTokenMem, getEthInUsd());
+        uint fundedValueUSD;
+        if(wethAuction){
+            fundedValueUSD = token1Balance.mul(getEthInUsd());
+        } else{
+            address ethTokenMem = dx.ethToken();
+            fundedValueUSD = _calculateFundedValueTokenToken(token1, token2, token1Balance, token2Balance, ethTokenMem, getEthInUsd());
+        }
         if(fundedValueUSD >= dx.thresholdNewTokenPair()){
             addTokenPair();
         }
     }
 
+    function witdraw() external atStage(Stages.Contribute) {
+        require(contributerAmountToken1[msg.sender] > 0 || contributerAmountToken2[msg.sender] > 0);
+        uint contributedToken1 = contributerAmountToken1[msg.sender];
+        uint contributedToken2 = contributerAmountToken2[msg.sender];
+        contributerAmountToken1[msg.sender] = 0;
+        contributerAmountToken2[msg.sender] = 0;
+        if(wethAuction){
+            if(this.balance < contributedToken1){
+                contributedToken1 = contributedToken1 - this.balance;
+                this.transfer(msg.sender, this.balance);
+            } else{
+                this.transfer(msg.sender, contributerAmountToken1[msg.sender]);
+                contributedToken1 = 0;
+            }
+        }
+        
+        require(token1.transfer(msg.sender, contributedToken1));
+        require(token2.transfer(msg.sender, contributedToken2));
+       
+    }
+
+    function () public payable {
+        require(msg.value > 0);
+        contribute(0, 0);
+    }
 
     function _calculateFundedValueTokenToken(
         address token1,
@@ -156,12 +199,16 @@ contract PoolToken {
 
     function addTokenPair() internal {
         stage = Stages.Collect;
+        if(wethAuction){
+            uint ethBalance = address(this).balance;
+            IEtherToken(address(token1)).deposit.value(ethBalance)();
+        }
 
         token1.approve(address(dx), token1Balance);
         token2.approve(address(dx), token2Balance);
 
-        dx.deposit( address(token1), token1Balance);
-        dx.deposit( address(token2), token2Balance);
+        dx.deposit(address(token1), token1Balance);
+        dx.deposit(address(token2), token2Balance);
 
         dx.addTokenPair(
             address(token1),
@@ -178,7 +225,6 @@ contract PoolToken {
      * @dev Collects the seller funds to the Pool. When succeeds alows to collect share. 
      */
     function collectFunds() public atStage(Stages.Collect) {
-
         stage = Stages.Claim;
         uint auctionIndex = dx.getAuctionIndex(address(token1), address(token2));
         
@@ -187,7 +233,6 @@ contract PoolToken {
         newToken1Balance = dx.balances(address(token1),address(this));
         newToken2Balance = dx.balances(address(token2),address(this));
         dx.withdraw(address(token1),newToken1Balance);
-
         dx.withdraw(address(token2),newToken2Balance);
     }
 
@@ -209,20 +254,13 @@ contract PoolToken {
         emit Claim(msg.sender, shareToken2);
     }
 
-
+    /**
+     * @dev Get value of one eth in USD.
+     */
     function getEthInUsd() public view returns (uint) {
         PriceOracleInterface priceOracle = PriceOracleInterface(dx.ethUSDOracle());
         uint etherUsdPrice = priceOracle.getUSDETHPrice();
         return etherUsdPrice;
-    }
-
-    /**
-     * @dev Get the eth value of contract in USD.
-     */
-    function getBalanceInUsd() public view returns (uint) {
-        // Return the price in USD:
-        return (address(this).balance * getEthInUsd());
-        
     }
 
 

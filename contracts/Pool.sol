@@ -117,7 +117,7 @@ contract Pool {
     function addTokenPair() internal {
         stage = Stages.Collect;
         ethBalance = address(this).balance;
-//this not save?
+//this not save? 
         weth.deposit.value(ethBalance)();
         weth.approve(address(dx), ethBalance);
 

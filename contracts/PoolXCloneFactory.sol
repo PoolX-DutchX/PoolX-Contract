@@ -1,40 +1,39 @@
 pragma solidity ^0.4.21;
 
 import "./Pool.sol";
-import "@optionality.io/clone-factory/contracts/CloneFactory.sol";
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "../node_modules/@optionality.io/clone-factory/contracts/CloneFactory.sol";
+import "../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
 
 contract PoolXCloneFactory is Ownable, CloneFactory {
+    address public libraryAddress;
 
-  address public libraryAddress;
+    event PoolCreated(address newPoolAddress);
 
-  event PoolCreated(address newPoolAddress);
+    function PoolXCloneFactory(address _libraryAddress) public {
+        libraryAddress = _libraryAddress;
+    }
 
-  function PoolXCloneFactory(address _libraryAddress) public {
-    libraryAddress = _libraryAddress;
-  }
+    function setLibraryAddress(address _libraryAddress) public onlyOwner {
+        libraryAddress = _libraryAddress;
+    }
 
-  function setLibraryAddress(address _libraryAddress) public onlyOwner {
-    libraryAddress = _libraryAddress;
-  }
-
-  function createPool(
+    function createPool(
         address _dx,
         address _weth,
         address _token,
         uint _initialClosingPriceNum,
         uint _initialClosingPriceDen
-  ) public onlyOwner {
-    address clone = createClone(libraryAddress);
-    Pool(clone).init(
-        _dx,
-        _weth,
-        _token,
-        _initialClosingPriceNum,
-        _initialClosingPriceDen
-    );
-    emit PoolCreated(address(clone));
-  }
+    ) public onlyOwner {
+        address clone = createClone(libraryAddress);
+        Pool(clone).init(
+            _dx,
+            _weth,
+            _token,
+            _initialClosingPriceNum,
+            _initialClosingPriceDen
+        );
+        emit PoolCreated(address(clone));
+    }
 
 }

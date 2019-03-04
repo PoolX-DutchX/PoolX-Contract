@@ -7,7 +7,6 @@ pragma solidity ^0.4.21;
 //  For other environments, we just use the compiled contracts from the NPM
 //  package
 
-import "@gnosis.pm/dx-contracts/contracts/DxDevDependencies.sol";
-import "@gnosis.pm/gno-token/contracts/TokenGNO.sol";
+import "../node_modules/@gnosis.pm/dx-contracts/contracts/DxDevDependencies.sol";
 
 contract AppDependencies {}

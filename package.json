@@ -16,11 +16,16 @@
   "dependencies": {
     "@gnosis.pm/dx-contracts": "^1.0.5",
     "@optionality.io/clone-factory": "^0.1.6",
+    "babel-eslint": "^10.0.1",
     "chai": "^4.1.2",
     "chai-as-promised": "^7.1.1",
     "chai-bignumber": "^2.0.2",
+    "eslint": "^5.15.0",
+    "eslint-config-prettier": "^4.1.0",
+    "eslint-plugin-prettier": "^3.0.1",
     "ganache-cli": "^6.1.8",
     "openzeppelin-solidity": "^1.12.0",
+    "prettier": "^1.16.4",
     "truffle-contract": "^3.0.6",
     "truffle-flattener": "^1.2.6",
     "truffle-hdwallet-provider": "0.0.5"

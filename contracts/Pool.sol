@@ -1,9 +1,6 @@
-pragma solidity ^0.4.21;
+pragma solidity ^0.5.2;
 
-// import "@gnosis.pm/util-contracts/contracts/Token.sol";
-// import "@gnosis.pm/util-contracts/contracts/EtherToken.sol";
 import "./IEtherToken.sol";
-
 import "../node_modules/@gnosis.pm/dx-contracts/contracts/DutchExchange.sol";
 import "../node_modules/@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInterface.sol";
 import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
@@ -42,7 +39,7 @@ contract Pool {
 
     function init (
         address _dx,
-        address _weth,
+        address payable _weth,
         address _token,
         uint _initialClosingPriceNum,
         uint _initialClosingPriceDen
@@ -76,7 +73,7 @@ contract Pool {
         address _token,
         uint _initialClosingPriceNum,
         uint _initialClosingPriceDen
-    ) internal {
+    ) internal pure {
         require(address(_dx) != address(0));
         require(address(_weth) != address(0));
         require(address(_token) != address(0));
@@ -173,9 +170,10 @@ contract Pool {
         
     }
 
-    function () public payable {
-        contribute();
-    }
+    // Do we need this fallback function??? It gives errors in the PoolCloneFactory when it is uncommented
+    // function () external payable {
+    //     contribute();
+    // }
 
     event Contribute(
          address sender,

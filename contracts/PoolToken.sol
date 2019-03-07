@@ -1,9 +1,6 @@
-pragma solidity ^0.4.21;
+pragma solidity ^0.5.2;
 
-// import "@gnosis.pm/util-contracts/contracts/Token.sol";
-// import "@gnosis.pm/util-contracts/contracts/EtherToken.sol";
 import "./IEtherToken.sol";
-
 import "../node_modules/@gnosis.pm/dx-contracts/contracts/DutchExchange.sol";
 import "../node_modules/@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInterface.sol";
 import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
@@ -19,7 +16,7 @@ contract PoolToken {
     uint public initialClosingPriceDen;
 
     DutchExchange public dx;
-    address public token1;
+    IEtherToken public token1;
     ERC20 public token2;
 
 
@@ -47,8 +44,8 @@ contract PoolToken {
 
     function init (
         address _dx,
-        address _token1,
-        address _token2,
+        address payable _token1,
+        address payable _token2,
         uint _initialClosingPriceNum,
         uint _initialClosingPriceDen
     )
@@ -66,18 +63,17 @@ contract PoolToken {
         
         require(dx.getAuctionIndex(_token1, _token2) == 0);
 
-        if(dx.ethToken() == _token1){
-            token1 = ERC20(_token1);
+        if(dx.ethToken() == _token1) {
+            token1 = IEtherToken(_token1);
             token2 = ERC20(_token2);
 
         } else if (dx.ethToken() == _token2) {
-            token1 = ERC20(_token2);
+            token1 = IEtherToken(_token2);
             token2 = ERC20(_token1);
         } else {
-            token1 = ERC20(_token1);
+            token1 = IEtherToken(_token1);
             token2 = ERC20(_token2);
             wethAuction = false;
-
         }
 
         initialClosingPriceNum = _initialClosingPriceNum;
@@ -91,7 +87,7 @@ contract PoolToken {
         address _token2,
         uint _initialClosingPriceNum,
         uint _initialClosingPriceDen
-    ) internal {
+    ) internal pure {
         require(address(_dx) != address(0));
         require(address(_token1) != address(0));
         require(address(_token2) != address(0));
@@ -126,7 +122,7 @@ contract PoolToken {
             fundedValueUSD = token1Balance.mul(getEthInUsd());
         } else{
             address ethTokenMem = dx.ethToken();
-            fundedValueUSD = _calculateFundedValueTokenToken(token1, token2, token1Balance, token2Balance, ethTokenMem, getEthInUsd());
+            fundedValueUSD = _calculateFundedValueTokenToken(address(token1), address(token2), token1Balance, token2Balance, ethTokenMem, getEthInUsd());
         }
         if(fundedValueUSD >= dx.thresholdNewTokenPair()){
             addTokenPair();
@@ -140,11 +136,11 @@ contract PoolToken {
         contributerAmountToken1[msg.sender] = 0;
         contributerAmountToken2[msg.sender] = 0;
         if(wethAuction){
-            if(this.balance < contributedToken1){
-                contributedToken1 = contributedToken1 - this.balance;
-                this.transfer(msg.sender, this.balance);
+            if(address(this).balance < contributedToken1){
+                contributedToken1 = contributedToken1 - address(this).balance;
+                address(this).transfer(address(this).balance);
             } else{
-                this.transfer(msg.sender, contributerAmountToken1[msg.sender]);
+                address(this).transfer(contributerAmountToken1[msg.sender]);
                 contributedToken1 = 0;
             }
         }
@@ -154,14 +150,14 @@ contract PoolToken {
        
     }
 
-    function () public payable {
+    function () external payable {
         require(msg.value > 0);
         contribute(0, 0);
     }
 
     function _calculateFundedValueTokenToken(
-        address token1,
-        address token2,
+        address _token1,
+        address _token2,
         uint token1Funding,
         uint token2Funding,
         address ethTokenMem,
@@ -173,20 +169,20 @@ contract PoolToken {
     {
         // We require there to exist ethToken-Token auctions
         // R3.1
-        require(dx.getAuctionIndex(token1, ethTokenMem) > 0);
+        require(dx.getAuctionIndex(_token1, ethTokenMem) > 0);
 
         // R3.2
-        require(dx.getAuctionIndex(token2, ethTokenMem) > 0);
+        require(dx.getAuctionIndex(_token2, ethTokenMem) > 0);
 
         // Price of Token 1
         uint priceToken1Num;
         uint priceToken1Den;
-        (priceToken1Num, priceToken1Den) = dx.getPriceOfTokenInLastAuction(token1);
+        (priceToken1Num, priceToken1Den) = dx.getPriceOfTokenInLastAuction(_token1);
 
         // Price of Token 2
         uint priceToken2Num;
         uint priceToken2Den;
-        (priceToken2Num, priceToken2Den) = dx.getPriceOfTokenInLastAuction(token2);
+        (priceToken2Num, priceToken2Den) = dx.getPriceOfTokenInLastAuction(_token2);
 
         // Compute funded value in ethToken and USD
         // 10^30 * 10^30 = 10^60
@@ -200,7 +196,7 @@ contract PoolToken {
         stage = Stages.Collect;
         if(wethAuction){
             uint ethBalance = address(this).balance;
-            IEtherToken(address(token1)).deposit.value(ethBalance)();
+            IEtherToken(token1).deposit.value(ethBalance)();
         }
 
         token1.approve(address(dx), token1Balance);

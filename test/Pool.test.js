@@ -6,10 +6,7 @@ const DutchExchange = artifacts.require('./DutchExchange.sol')
 const PoolXCloneFactory = artifacts.require('./PoolXCloneFactory.sol')
 const BigNumber = web3.BigNumber
 
-const {
-  increaseTimeTo,
-  duration,
-} = require('openzeppelin-solidity/test/helpers/increaseTime')
+const { increaseTimeTo, duration } = require('./helpers/timer')
 
 // eslint-disable-next-line
 const should = require('chai')

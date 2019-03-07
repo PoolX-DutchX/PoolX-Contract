@@ -1,7 +1,7 @@
-pragma solidity ^0.4.21;
+pragma solidity ^0.5.2;
 
 import "./Pool.sol";
-import "../node_modules/@optionality.io/clone-factory/contracts/CloneFactory.sol";
+import "./CloneFactory.sol";
 import "../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
 
@@ -10,7 +10,7 @@ contract PoolXCloneFactory is Ownable, CloneFactory {
 
     event PoolCreated(address newPoolAddress);
 
-    function PoolXCloneFactory(address _libraryAddress) public {
+    constructor(address _libraryAddress) public {
         libraryAddress = _libraryAddress;
     }
 
@@ -20,7 +20,7 @@ contract PoolXCloneFactory is Ownable, CloneFactory {
 
     function createPool(
         address _dx,
-        address _weth,
+        address payable _weth,
         address _token,
         uint _initialClosingPriceNum,
         uint _initialClosingPriceDen

@@ -1,16 +1,16 @@
 /* global artifacts */
 /* eslint no-undef: "error" */
 
-const migrateDx = require('@gnosis.pm/dx-contracts/src/migrations')
+const migrateDx = require('@gnosis.pm/dx-contracts/src/migrations-truffle-4')
 
-module.exports = function (deployer, network, accounts) {
+module.exports = function(deployer, network, accounts) {
     return migrateDx({
-        artifacts,
-        deployer,
-        network,
-        accounts,
-        web3,
-        thresholdNewTokenPairUsd: process.env.THRESHOLD_NEW_TOKEN_PAIR_USD,
-        thresholdAuctionStartUsd: process.env.THRESHOLD_AUCTION_START_USD
+    artifacts,
+    deployer,
+    network,
+    accounts,
+    web3,
+    thresholdNewTokenPairUsd: process.env.THRESHOLD_NEW_TOKEN_PAIR_USD,
+    thresholdAuctionStartUsd: process.env.THRESHOLD_AUCTION_START_USD
     })
 }

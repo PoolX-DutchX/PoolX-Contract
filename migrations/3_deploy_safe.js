@@ -6,7 +6,7 @@ const ETH_TEST_AMOUNT = 1e18;
 const Pool = artifacts.require("Pool");
 const DutchExchangeProxy = artifacts.require("DutchExchangeProxy");
 const EtherToken = artifacts.require("EtherToken");
-const StandardToken = artifacts.require("StandardToken");
+const StandardToken = artifacts.require("ERC20");
 const PoolXCloneFactory = artifacts.require("./PoolXCloneFactory.sol");
 
 let dutchExchangeProxy;

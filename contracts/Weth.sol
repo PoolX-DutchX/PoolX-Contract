@@ -1,4 +1,4 @@
-pragma solidity ^0.4.21;
+pragma solidity ^0.5.2;
 
 import "../node_modules/@gnosis.pm/util-contracts/contracts/EtherToken.sol";
 

@@ -4,7 +4,7 @@ import "./Pool.sol";
 import "./CloneFactory.sol";
 import "../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
-
+/// @title Allows to create a new pool
 contract PoolXCloneFactory is Ownable, CloneFactory {
     address public libraryAddress;
 

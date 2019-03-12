@@ -1,5 +1,7 @@
 pragma solidity ^0.5.2;
 
+/// @title Standard Truffle Migrations file
+/// @dev used to apply yet unapplied scripts in the migration folder
 contract Migrations {
     address public owner;
     uint public last_completed_migration;

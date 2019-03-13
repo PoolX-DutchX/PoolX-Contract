@@ -27,10 +27,10 @@ contract Pool {
 
     bool public isAuctionWithWeth = true;
 
-    Stages public stage = Stages.Initilize;
+    Stages public stage = Stages.Initialize;
 
     enum Stages {
-        Initilize,
+        Initialize,
         Contribute,
         Collect,
         Claim
@@ -300,12 +300,11 @@ contract Pool {
         return etherUsdPrice;
     }
 
-    // OLD COMMENT LEFT TO CLARIFY: 
     // Do we need this fallback function??? It gives errors in the PoolCloneFactory when it is uncommented
-    function() external payable {
-        require(msg.value > 0, "Please send ether to contribute!");
-        contribute(0, 0);
-    }
+    // function() external payable {
+    //     require(msg.value > 0, "Please send ether to contribute!");
+    //     contribute(0, 0);
+    // }
 
     event Contribute(
          address sender,

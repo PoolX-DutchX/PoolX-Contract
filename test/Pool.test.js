@@ -20,7 +20,8 @@ contract('Pool', ([owner]) => {
   const initialClosingPriceDen = 1
 
   beforeEach(async () => {
-    token = await Token.new(100e18)
+    //workaround, see https://github.com/ethereum/web3.js/issues/2077
+    token = await Token.new(web3.utils.toWei("100000000000000000000"))
     weth = await EtherToken.deployed()
     dx = await DutchExchangeProxy.deployed()
     pool = await Pool.new()

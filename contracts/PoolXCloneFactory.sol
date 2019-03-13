@@ -21,7 +21,7 @@ contract PoolXCloneFactory is Ownable, CloneFactory {
     function createPool(
         address _dx,
         address payable _weth,
-        address _token,
+        address payable _token,
         uint _initialClosingPriceNum,
         uint _initialClosingPriceDen
     ) public onlyOwner {

@@ -300,7 +300,8 @@ contract Pool {
         return etherUsdPrice;
     }
 
-    // Do we need this fallback function??? It gives errors in the PoolCloneFactory when it is uncommented
+    // Commented because of errors in PoolCloneFactory - might relate to 
+    // https://github.com/trufflesuite/truffle/issues/1640 
     // function() external payable {
     //     require(msg.value > 0, "Please send ether to contribute!");
     //     contribute(0, 0);

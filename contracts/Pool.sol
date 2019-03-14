@@ -44,14 +44,14 @@ contract Pool {
         _;
     }
 
-    function init (
+    function init(
         address _dx,
         address payable _token1,
         address payable _token2,
         uint _initialClosingPriceNum,
         uint _initialClosingPriceDen
     )
-        public
+        external
         atStage(Stages.Initialize)
     {
         _addTokenPairRequirements(
@@ -90,7 +90,7 @@ contract Pool {
         uint256 _initialClosingPriceNum,
         uint256 _initialClosingPriceDen
     ) 
-        internal
+        private
         pure
     {
         require(address(_dx) != address(0), "_dx can't be 0!");
@@ -135,17 +135,17 @@ contract Pool {
         token2Balance = token2Balance.add(contributeToken2);
 
         uint256 fundedValueUSD = isAuctionWithWeth ?
-            token1Balance.mul(getEthInUsd())
+            token1Balance.mul(_getEthInUsd())
             : _calculateFundedValueTokenToken(
                 address(token1),
                 address(token2),
                 token1Balance,
                 token2Balance,
-                getEthInUsd()
+                _getEthInUsd()
             );
 
         if (fundedValueUSD >= dx.thresholdNewTokenPair()) {
-            addTokenPair();
+            _addTokenPair();
         }
     }
 
@@ -156,7 +156,7 @@ contract Pool {
         uint token2Funding,
         uint ethUSDPrice
     )
-        internal
+        private
         view
         returns (uint256)
     {
@@ -223,7 +223,7 @@ contract Pool {
         ); 
     }
 
-    function addTokenPair() internal {
+    function _addTokenPair() private {
         stage = Stages.Collect;
         if(isAuctionWithWeth){
             uint256 ethBalance = address(this).balance;
@@ -250,7 +250,7 @@ contract Pool {
     /**
      * @dev Collects the seller funds to the Pool. When successful, allows to collect share. 
      */
-    function collectFunds() public atStage(Stages.Collect) {
+    function collectFunds() external atStage(Stages.Collect) {
         stage = Stages.Claim;
         uint256 auctionIndex = dx.getAuctionIndex(address(token1), address(token2));
         
@@ -265,7 +265,7 @@ contract Pool {
     /**
      * @dev contributors can claim their token share.
      */
-    function claimFunds() public atStage(Stages.Claim){
+    function claimFunds() external atStage(Stages.Claim){
         require(
             contributorAmountToken1[msg.sender] > 0 ||
             contributorAmountToken2[msg.sender] > 0,
@@ -294,7 +294,7 @@ contract Pool {
     /**
      * @dev Get value of one ether in USD.
      */
-    function getEthInUsd() public view returns (uint256) {
+    function _getEthInUsd() private view returns (uint256) {
         PriceOracleInterface priceOracle = PriceOracleInterface(dx.ethUSDOracle());
         uint256 etherUsdPrice = priceOracle.getUSDETHPrice();
         return etherUsdPrice;

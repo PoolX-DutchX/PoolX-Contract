@@ -4,7 +4,7 @@ import "./Pool.sol";
 import "./CloneFactory.sol";
 import "../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
-
+/// @title Allows to create a new pool
 contract PoolXCloneFactory is Ownable, CloneFactory {
     address public libraryAddress;
 
@@ -21,7 +21,7 @@ contract PoolXCloneFactory is Ownable, CloneFactory {
     function createPool(
         address _dx,
         address payable _weth,
-        address _token,
+        address payable _token,
         uint _initialClosingPriceNum,
         uint _initialClosingPriceDen
     ) public onlyOwner {

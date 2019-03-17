@@ -255,7 +255,7 @@ contract Pool {
         uint256 auctionIndex = dx.getAuctionIndex(address(token1), address(token2));
         
         //should revert if not finished?
-        dx.claimSellerFunds(address(token1), address(token2), address(this), auctionIndex);
+        dx.claimSellerFunds(address(token1), address(token2), address(this), 1);
         newToken1Balance = dx.balances(address(token1),address(this));
         newToken2Balance = dx.balances(address(token2),address(this));
         dx.withdraw(address(token1),newToken1Balance);

@@ -101,15 +101,21 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
       })
       it('should withdraw weth token from contract', async () => {
         const contributor1BalanceBefore = await balance.current(contributor1)
-        await pool.withdraw({ from: contributor1 })
+        const receipt = await pool.withdraw({ from: contributor1 })
         const contributor1BalanceAfter = await balance.current(contributor1)
+
+        const tx = await web3.eth.getTransaction(receipt.tx)
+        const gasUsed = new BN(receipt.receipt.gasUsed)
+        const gasPrice = new BN(tx.gasPrice)
+        const gasCosts = gasUsed.mul(gasPrice)
+
 
         const contributedAmountToken1 = await pool.contributorAmountToken1(contributor1)
         contributedAmountToken1.should.be.bignumber.eq("0")
         const contributedAmountToken2 = await pool.contributorAmountToken2(contributor1)
         contributedAmountToken2.should.be.bignumber.eq("0")
-
-        contributor1BalanceBefore.should.be.bignumber.eq(contributor1BalanceAfter)
+        
+        contributor1BalanceBefore.sub(gasCosts).should.be.bignumber.eq(contributor1BalanceAfter)
 
 
      })

@@ -62,7 +62,7 @@ contract Pool {
             _initialClosingPriceDen
         );
         dx = DutchExchange(_dx);
-        
+
         require(
             dx.getAuctionIndex(_token1, _token2) == 0,
             "Auction for token pair already started!"
@@ -89,7 +89,7 @@ contract Pool {
         address _token2,
         uint256 _initialClosingPriceNum,
         uint256 _initialClosingPriceDen
-    ) 
+    )
         private
         pure
     {
@@ -104,7 +104,7 @@ contract Pool {
     }
 
     /**
-     * @dev Contribute to a Pool with ether. The stage is finished when ether worth 10000$ 
+     * @dev Contribute to a Pool with ether. The stage is finished when ether worth 1000$
      *      is collected and a dx token pair (token1/new token is created).
      */
     function contribute(uint256 contributeToken1, uint256 contributeToken2) public payable atStage(Stages.Contribute)
@@ -135,13 +135,13 @@ contract Pool {
         token2Balance = token2Balance.add(contributeToken2);
 
         uint256 fundedValueUSD = isAuctionWithWeth ?
-            token1Balance.mul(_getEthInUsd())
+            token1Balance.mul(getEthInUsd())
             : _calculateFundedValueTokenToken(
                 address(token1),
                 address(token2),
                 token1Balance,
                 token2Balance,
-                _getEthInUsd()
+                getEthInUsd()
             );
 
         if (fundedValueUSD >= dx.thresholdNewTokenPair()) {
@@ -212,7 +212,7 @@ contract Pool {
                 contributedToken1 = 0;
             }
         }
-        
+
         require(
             token1.transfer(msg.sender, contributedToken1),
             "Contract has not enough funds of token1 for withdrawal!"
@@ -220,7 +220,7 @@ contract Pool {
         require(
             token2.transfer(msg.sender, contributedToken2),
             "Contract has not enough funds of token2 for withdrawal!"
-        ); 
+        );
     }
 
     function _addTokenPair() private {
@@ -248,12 +248,12 @@ contract Pool {
     }
 
     /**
-     * @dev Collects the seller funds to the Pool. When successful, allows to collect share. 
+     * @dev Collects the seller funds to the Pool. When successful, allows to collect share.
      */
     function collectFunds() external atStage(Stages.Collect) {
         stage = Stages.Claim;
         uint256 auctionIndex = dx.getAuctionIndex(address(token1), address(token2));
-        
+
         //should revert if not finished?
         dx.claimSellerFunds(address(token1), address(token2), address(this), 1);
         newToken1Balance = dx.balances(address(token1),address(this));
@@ -294,14 +294,14 @@ contract Pool {
     /**
      * @dev Get value of one ether in USD.
      */
-    function _getEthInUsd() private view returns (uint256) {
+    function getEthInUsd() public view returns (uint256) {
         PriceOracleInterface priceOracle = PriceOracleInterface(dx.ethUSDOracle());
         uint256 etherUsdPrice = priceOracle.getUSDETHPrice();
         return etherUsdPrice;
     }
 
-    // Commented because of errors in PoolCloneFactory - might relate to 
-    // https://github.com/trufflesuite/truffle/issues/1640 
+    // Commented because of errors in PoolCloneFactory - might relate to
+    // https://github.com/trufflesuite/truffle/issues/1640
     // function() external payable {
     //     require(msg.value > 0, "Please send ether to contribute!");
     //     contribute(0, 0);

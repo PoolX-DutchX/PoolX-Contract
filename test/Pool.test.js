@@ -130,7 +130,7 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
       })
     })
 
-    it('should be able to list the token', async () => {
+    it.only('should be able to list the token', async () => {
 
   
       const auctionStart = (await dutchX.getAuctionStart.call(
@@ -158,28 +158,65 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
       )
 
 
-      let ownerBalance = await token.balanceOf(owner)
-      ownerBalance.should.be.bignumber.eq("0")
+      let poolBalance = await token.balanceOf(pool.address)
+
+      poolBalance.should.be.bignumber.eq("0")
       await time.increaseTo(auctionStart + duration.hours(15))
-      const balance1 =  await dutchX.balances(weth.address, pool.address)
-      const balance2 =  await dutchX.balances(weth.address, pool.address)
 
       await pool.collectFunds()
 
-
       poolBalance = await token.balanceOf(pool.address)
-      auctionListedIndex = await dutchX.getAuctionIndex(
-        weth.address,
-        token.address
-      )
-
-      await pool.claimFunds()
-      ownerBalance = await token.balanceOf(owner)
  
-      ownerBalance = await token.balanceOf(pool.address)
+      assert(poolBalance.gt(0))
+     
 
     })
   })
 
-  describe('#claimFunds', () => {})
+  describe('#claimFunds', () => {
+    beforeEach(async () => {
+  
+      await pool.contribute(0, 0, {
+        from: owner,
+        value: oneHundredEth,
+      })
+    })
+
+    it.only('should claim funds', async () => {
+
+  
+      const auctionStart = (await dutchX.getAuctionStart.call(
+        weth.address,
+        token.address
+      )).toNumber()
+
+      await time.increaseTo(auctionStart + duration.hours(14))
+      let auctionListedIndex = await dutchX.getAuctionIndex(
+        weth.address,
+        token.address
+      )
+
+      // // await increaseTime(duration.hours(1));
+      await token.approve(dutchX.address, oneHundredEth)
+      await dutchX.deposit(token.address, oneHundredEth)
+
+
+      // // eslint-disable-next-line
+      const postBuyOrder = await dutchX.postBuyOrder(
+        weth.address,
+        token.address,
+        auctionListedIndex,
+        oneHundredEth
+      )
+      await time.increaseTo(auctionStart + duration.hours(15))
+      await pool.collectFunds()
+
+      let ownerBalance = await token.balanceOf(owner)
+      ownerBalance.should.be.bignumber.eq("0")
+
+      await pool.claimFunds()
+      ownerBalance = await token.balanceOf(owner)
+      assert(ownerBalance.gt(0))
+    })
+  })
 })

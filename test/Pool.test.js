@@ -54,6 +54,7 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
       poolBalance.should.be.bignumber.eq(oneEth)
     })
 
+
     it('should deposit weth token in the contract', async () => {
 
         await weth.deposit({ from: contributor1, value: oneEth })
@@ -90,6 +91,14 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
       // proves that token was listed. Shows that in the dutchX exchange the first auction for the token pair exists
       auctionListedIndex.should.be.bignumber.eq("1")
     })
+    it('should able to contribute in weth', async () => {
+    })
+    it('should able to contribute in eth', async () => {
+    })
+    it('should able to contribute in token2', async () => {
+    })
+    it('should not be able to contribute after start', async () => {
+    })
   })
 
   describe('#withdraw', () => {
@@ -116,9 +125,12 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
         contributedAmountToken2.should.be.bignumber.eq("0")
 
         contributor1BalanceBefore.sub(gasCosts).should.be.bignumber.eq(contributor1BalanceAfter)
-
-
      })
+    it('should withdraw token2 from contract', async () => {
+    })
+
+    it('should not be able to withdraw when token is added to dx', async () => {
+    })
   })
 
   describe('#collectFunds', () => {
@@ -129,10 +141,11 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
         value: oneHundredEth,
       })
     })
-
+    it('should not work before token are sold', async () => {
+    })
+    it('should not work when funds are already collected', async () => {
+    })
     it('should be able to collect funds', async () => {
-
-
       const auctionStart = (await dutchX.getAuctionStart.call(
         weth.address,
         token.address
@@ -180,7 +193,10 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
         value: oneHundredEth,
       })
     })
-
+    it('should not work when funds are NOT collected', async () => {
+    })
+    it('should not be possible to claim second time', async () => {
+    })
     it('should claim funds', async () => {
 
 

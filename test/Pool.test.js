@@ -74,10 +74,10 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
     })
 
     it('should be able to list the token', async () => {
-        await weth.deposit({ from: contributor1, value: oneHundredEth })
+      await weth.deposit({ from: contributor1, value: oneHundredEth })
 
-        await weth.approve(pool.address, oneHundredEth,{ from: contributor1})
-        await pool.contribute(oneHundredEth,0,{ from: contributor1 })
+      await weth.approve(pool.address, oneHundredEth,{ from: contributor1})
+      await pool.contribute(oneHundredEth,0,{ from: contributor1 })
 
       // no more ether in pool contract
       const poolBalance = await web3.eth.getBalance(pool.address)
@@ -114,7 +114,7 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
         contributedAmountToken1.should.be.bignumber.eq("0")
         const contributedAmountToken2 = await pool.contributorAmountToken2(contributor1)
         contributedAmountToken2.should.be.bignumber.eq("0")
-        
+
         contributor1BalanceBefore.sub(gasCosts).should.be.bignumber.eq(contributor1BalanceAfter)
 
 
@@ -123,16 +123,16 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
 
   describe('#collectFunds', () => {
     beforeEach(async () => {
-  
+
       await pool.contribute(0, 0, {
         from: owner,
         value: oneHundredEth,
       })
     })
 
-    it('should be able to list the token', async () => {
+    it('should be able to collect funds', async () => {
 
-  
+
       const auctionStart = (await dutchX.getAuctionStart.call(
         weth.address,
         token.address
@@ -144,7 +144,6 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
         token.address
       )
 
-      // // await increaseTime(duration.hours(1));
       await token.approve(dutchX.address, oneHundredEth)
       await dutchX.deposit(token.address, oneHundredEth)
 
@@ -166,16 +165,16 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
       await pool.collectFunds()
 
       poolBalance = await token.balanceOf(pool.address)
- 
+
       assert(poolBalance.gt(0))
-     
+
 
     })
   })
 
   describe('#claimFunds', () => {
     beforeEach(async () => {
-  
+
       await pool.contribute(0, 0, {
         from: owner,
         value: oneHundredEth,
@@ -184,7 +183,7 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
 
     it('should claim funds', async () => {
 
-  
+
       const auctionStart = (await dutchX.getAuctionStart.call(
         weth.address,
         token.address

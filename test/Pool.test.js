@@ -130,7 +130,7 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
       })
     })
 
-    it.only('should be able to list the token', async () => {
+    it('should be able to list the token', async () => {
 
   
       const auctionStart = (await dutchX.getAuctionStart.call(
@@ -182,7 +182,7 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
       })
     })
 
-    it.only('should claim funds', async () => {
+    it('should claim funds', async () => {
 
   
       const auctionStart = (await dutchX.getAuctionStart.call(

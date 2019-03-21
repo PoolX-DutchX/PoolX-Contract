@@ -253,13 +253,19 @@ contract Pool {
     function collectFunds() external atStage(Stages.Collect) {
         stage = Stages.Claim;
         uint256 auctionIndex = dx.getAuctionIndex(address(token1), address(token2));
-
+        require(auctionIndex == 2);
         //should revert if not finished?
         dx.claimSellerFunds(address(token1), address(token2), address(this), 1);
         newToken1Balance = dx.balances(address(token1),address(this));
         newToken2Balance = dx.balances(address(token2),address(this));
-        dx.withdraw(address(token1),newToken1Balance);
-        dx.withdraw(address(token2),newToken2Balance);
+        require(newToken1Balance > 0 || newToken2Balance > 0);
+        if(newToken1Balance > 0){
+            dx.withdraw(address(token1),newToken1Balance);
+
+        }
+        if(newToken2Balance > 0){
+            dx.withdraw(address(token2),newToken2Balance);
+        }
     }
 
     /**
@@ -271,24 +277,37 @@ contract Pool {
             contributorAmountToken2[msg.sender] > 0,
             "User has no funds to claim!"
         );
+        if(token1Balance > 0){
+            uint256 shareToken2 = contributorAmountToken1[msg.sender].mul(newToken2Balance).div(token1Balance);
+            contributorAmountToken1[msg.sender] = 0;
 
-        uint256 shareToken2 = contributorAmountToken1[msg.sender].mul(newToken2Balance).div(token1Balance);
-        uint256 shareToken1 = contributorAmountToken2[msg.sender].mul(newToken1Balance).div(token2Balance);
+            if(shareToken2 > 0){
+                require(
+                    token2.transfer(msg.sender, shareToken2),
+                    "Contract has not enough token2 funds for user claim!"
+                );
+            }
+            emit Claim(msg.sender, shareToken2);
 
-        contributorAmountToken1[msg.sender] = 0;
-        contributorAmountToken2[msg.sender] = 0;
+        }
+        if(token2Balance > 0){
+            uint256 shareToken1 = contributorAmountToken2[msg.sender].mul(newToken1Balance).div(token2Balance);
+            contributorAmountToken2[msg.sender] = 0;
 
-        require(
-            token1.transfer(msg.sender, shareToken1),
-            "Contract has not enough token1 funds for user claim!"
-        );
-        require(
-            token2.transfer(msg.sender, shareToken2),
-            "Contract has not enough token2 funds for user claim!"
-        );
+            if(shareToken1 > 0){
+                require(
+                    token1.transfer(msg.sender, shareToken1),
+                    "Contract has not enough token1 funds for user claim!"
+                );
+            }
+            emit Claim(msg.sender, shareToken1);
 
-        emit Claim(msg.sender, shareToken1);
-        emit Claim(msg.sender, shareToken2);
+        }
+
+
+       
+        
+
     }
 
     /**

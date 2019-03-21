@@ -123,6 +123,7 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
 
   describe('#collectFunds', () => {
     beforeEach(async () => {
+  
       await pool.contribute(0, 0, {
         from: owner,
         value: oneHundredEth,
@@ -131,47 +132,52 @@ contract('Pool', ([owner, contributor1, contributor2]) => {
 
     it('should be able to list the token', async () => {
 
-      let auctionListedIndex = await dutchX.getAuctionIndex(
-        weth.address,
-        token.address
-      )
+  
       const auctionStart = (await dutchX.getAuctionStart.call(
         weth.address,
         token.address
       )).toNumber()
-      // const auctionStarts = await dutchX.auctionStarts(weth.address, token.address);
 
-      // await increaseTimeTo(auctionStarts);
-      await time.increaseTo(auctionStart + duration.hours(4))
+      await time.increaseTo(auctionStart + duration.hours(14))
+      let auctionListedIndex = await dutchX.getAuctionIndex(
+        weth.address,
+        token.address
+      )
 
       // // await increaseTime(duration.hours(1));
       await token.approve(dutchX.address, oneHundredEth)
       await dutchX.deposit(token.address, oneHundredEth)
 
-      // eslint-disable-next-line
+
+      // // eslint-disable-next-line
       const postBuyOrder = await dutchX.postBuyOrder(
         weth.address,
         token.address,
         auctionListedIndex,
         oneHundredEth
       )
+
+
+      let ownerBalance = await token.balanceOf(owner)
+      ownerBalance.should.be.bignumber.eq("0")
+      await time.increaseTo(auctionStart + duration.hours(15))
+      const balance1 =  await dutchX.balances(weth.address, pool.address)
+      const balance2 =  await dutchX.balances(weth.address, pool.address)
+
+      await pool.collectFunds()
+
+
+      poolBalance = await token.balanceOf(pool.address)
       auctionListedIndex = await dutchX.getAuctionIndex(
         weth.address,
         token.address
       )
 
-      let ownerBalance = await token.balanceOf(owner)
-      ownerBalance.should.be.bignumber.eq("0")
-      await pool.collectFunds()
-      // await pool.claimFunds()
-      // ownerBalance = await token.balanceOf(owner)
-      // console.log('====================================')
-      // console.log(ownerBalance)
-      // console.log('====================================')
-      // ownerBalance = await token.balanceOf(pool.address)
-      // console.log('====================================')
-      // console.log(ownerBalance)
-      // console.log('====================================')
+      await pool.claimFunds()
+      ownerBalance = await token.balanceOf(owner)
+ 
+      ownerBalance = await token.balanceOf(pool.address)
+
     })
   })
 

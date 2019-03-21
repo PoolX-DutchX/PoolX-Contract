@@ -14,7 +14,8 @@ function truffleConfig({
   urlRinkeby = "https://rinkeby.infura.io/",
   urlMainnet = "https://mainnet.infura.io",
   urlDevelopment = "localhost",
-  portDevelopment = 8545
+  portDevelopment = 8545,
+  portCoverage = 8555
 } = {}) {
   assert(mnemonic, "The mnemonic has not been provided");
   console.log(`Using gas limit: ${gas / 1000} K`);
@@ -35,6 +36,15 @@ function truffleConfig({
         gas,
         gasPrice,
         network_id: "*"
+      },
+      coverage: {
+        host: 'localhost',
+        network_id: '*', // eslint-disable-line camelcase
+        port: portCoverage,
+        //gas,
+        gas: 0xfffffffffff,
+        //gasPrice,
+        gasPrice: 0x01,
       },
       mainnet: {
         provider: _getProvider(urlMainnet),

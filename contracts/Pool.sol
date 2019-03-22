@@ -10,8 +10,8 @@ import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 contract Pool {
     using SafeMath for uint256;
 
-    mapping (address => uint256) public contributorAmountToken1;
-    mapping (address => uint256) public contributorAmountToken2;
+    mapping (address => uint256) public contributorToken1Amount;
+    mapping (address => uint256) public contributorToken2Amount;
 
     uint256 public initialClosingPriceNum;
     uint256 public initialClosingPriceDen;
@@ -125,8 +125,8 @@ contract Pool {
             "Missing contributeToken2 funds for contract!"
         );
 
-        contributorAmountToken1[msg.sender] = contributorAmountToken1[msg.sender].add(contributeToken1).add(msg.value);
-        contributorAmountToken2[msg.sender] = contributorAmountToken2[msg.sender].add(contributeToken2);
+        contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].add(contributeToken1).add(msg.value);
+        contributorToken2Amount[msg.sender] = contributorToken2Amount[msg.sender].add(contributeToken2);
 
         emit Contribute(msg.sender, address(token1), contributeToken1);
         emit Contribute(msg.sender, address(token2), contributeToken2);
@@ -193,24 +193,21 @@ contract Pool {
 
     function withdraw() external atStage(Stages.Contribute) {
         require(
-            contributorAmountToken1[msg.sender] > 0 || contributorAmountToken2[msg.sender] > 0,
+            contributorToken1Amount[msg.sender] > 0 || contributorToken2Amount[msg.sender] > 0,
             "No funds for user to withdraw!"
         );
 
-        uint256 contributedToken1 = contributorAmountToken1[msg.sender];
-        uint256 contributedToken2 = contributorAmountToken2[msg.sender];
+        uint256 contributedToken1 = contributorToken1Amount[msg.sender];
+        uint256 contributedToken2 = contributorToken2Amount[msg.sender];
 
-        contributorAmountToken1[msg.sender] = 0;
-        contributorAmountToken2[msg.sender] = 0;
+        contributorToken1Amount[msg.sender] = 0;
+        contributorToken2Amount[msg.sender] = 0;
 
         if (isAuctionWithWeth) {
-            if (address(this).balance < contributedToken1) {
-                contributedToken1 = contributedToken1.sub(address(this).balance);
-                address(msg.sender).transfer(address(this).balance);
-            } else {
-                address(msg.sender).transfer(contributorAmountToken1[msg.sender]);
-                contributedToken1 = 0;
-            }
+            uint256 ethRefund = contributedToken1 > address(this).balance
+                ? address(this).balance : contributedToken1;
+            address(msg.sender).transfer(ethRefund);
+            contributedToken1 = contributedToken1.sub(ethRefund); // WETH refund
         }
 
         require(
@@ -225,7 +222,8 @@ contract Pool {
 
     function _addTokenPair() private {
         stage = Stages.Collect;
-        if(isAuctionWithWeth){
+
+        if (isAuctionWithWeth) {
             uint256 ethBalance = address(this).balance;
             IEtherToken(address(token1)).deposit.value(ethBalance)();
         }
@@ -253,19 +251,40 @@ contract Pool {
     function collectFunds() external atStage(Stages.Collect) {
         stage = Stages.Claim;
         uint256 auctionIndex = dx.getAuctionIndex(address(token1), address(token2));
-        require(auctionIndex == 2);
-        //should revert if not finished?
+        require(auctionIndex > 1, 'Auction is not yet finished!');
+
         dx.claimSellerFunds(address(token1), address(token2), address(this), 1);
         newToken1Balance = dx.balances(address(token1),address(this));
         newToken2Balance = dx.balances(address(token2),address(this));
-        require(newToken1Balance > 0 || newToken2Balance > 0);
-        if(newToken1Balance > 0){
-            dx.withdraw(address(token1),newToken1Balance);
 
+        require(newToken1Balance > 0 || newToken2Balance > 0, 'There should be funds to withdraw!');
+
+        if (newToken1Balance > 0) {
+            dx.withdraw(address(token1), newToken1Balance);
         }
-        if(newToken2Balance > 0){
-            dx.withdraw(address(token2),newToken2Balance);
+
+        if (newToken2Balance > 0) {
+            dx.withdraw(address(token2), newToken2Balance);
         }
+    }
+
+    function transferTokensToUser(
+        ERC20 token,
+        uint256 contributorTokenAmount,
+        uint256 newTokenBalance,
+        uint256 tokenBalance
+    ) internal {
+        uint256 tokenShare = contributorTokenAmount
+            .mul(newTokenBalance)
+            .div(tokenBalance);
+
+        if (tokenShare > 0) {
+            require(
+                token.transfer(msg.sender, tokenShare),
+                "Contract has not enough token funds for user claim!"
+            );
+        }
+        emit Claim(msg.sender, tokenShare);
     }
 
     /**
@@ -273,41 +292,30 @@ contract Pool {
      */
     function claimFunds() external atStage(Stages.Claim){
         require(
-            contributorAmountToken1[msg.sender] > 0 ||
-            contributorAmountToken2[msg.sender] > 0,
+            contributorToken1Amount[msg.sender] > 0 ||
+            contributorToken2Amount[msg.sender] > 0,
             "User has no funds to claim!"
         );
-        if(token1Balance > 0){
-            uint256 shareToken2 = contributorAmountToken1[msg.sender].mul(newToken2Balance).div(token1Balance);
-            contributorAmountToken1[msg.sender] = 0;
 
-            if(shareToken2 > 0){
-                require(
-                    token2.transfer(msg.sender, shareToken2),
-                    "Contract has not enough token2 funds for user claim!"
-                );
-            }
-            emit Claim(msg.sender, shareToken2);
-
-        }
-        if(token2Balance > 0){
-            uint256 shareToken1 = contributorAmountToken2[msg.sender].mul(newToken1Balance).div(token2Balance);
-            contributorAmountToken2[msg.sender] = 0;
-
-            if(shareToken1 > 0){
-                require(
-                    token1.transfer(msg.sender, shareToken1),
-                    "Contract has not enough token1 funds for user claim!"
-                );
-            }
-            emit Claim(msg.sender, shareToken1);
-
+        if (token1Balance > 0) {
+            transferTokensToUser(
+                token2,
+                contributorToken1Amount[msg.sender],
+                newToken2Balance,
+                token1Balance
+            );
+            contributorToken1Amount[msg.sender] = 0;            
         }
 
-
-       
-        
-
+        if (token2Balance > 0) {
+            transferTokensToUser(
+                token1,
+                contributorToken2Amount[msg.sender],
+                newToken1Balance,
+                token2Balance
+            );
+            contributorToken2Amount[msg.sender] = 0;
+        }
     }
 
     /**

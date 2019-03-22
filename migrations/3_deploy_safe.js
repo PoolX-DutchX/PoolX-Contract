@@ -1,21 +1,21 @@
 /* global artifacts */
 /* eslint no-undef: "error" */
 
-const ETH_TEST_AMOUNT = 1e18;
+const ETH_TEST_AMOUNT = 1e18
 
-const Pool = artifacts.require("Pool");
-const DutchExchangeProxy = artifacts.require("DutchExchangeProxy");
-const EtherToken = artifacts.require("EtherToken");
-const StandardToken = artifacts.require("ERC20");
-const PoolXCloneFactory = artifacts.require("./PoolXCloneFactory.sol");
+const Pool = artifacts.require('Pool')
+const DutchExchangeProxy = artifacts.require('DutchExchangeProxy')
+const EtherToken = artifacts.require('EtherToken')
+const StandardToken = artifacts.require('ERC20')
+const PoolXCloneFactory = artifacts.require('./PoolXCloneFactory.sol')
 
-let dutchExchangeProxy;
-let etherToken;
-let token;
+let dutchExchangeProxy
+let etherToken
+let token
 
 module.exports = function(deployer, network, accounts) {
-  const account = accounts[0];
-  
+  const account = accounts[0]
+
   let deployerPromise = deployer
     // Make sure DutchX is deployed
     .then(() => DutchExchangeProxy.deployed())
@@ -23,25 +23,32 @@ module.exports = function(deployer, network, accounts) {
     // Deploy contracts
     .then(_dutchExchangeProxy => {
       dutchExchangeProxy = _dutchExchangeProxy
-      return EtherToken.deployed();
+      return EtherToken.deployed()
     })
     .then(_etherToken => {
-      etherToken = _etherToken;
-      
-      return StandardToken.new();
+      etherToken = _etherToken
+
+      return StandardToken.new()
     })
     .then(_token => {
-      token = _token;
+      token = _token
 
-      return deployer.deploy(Pool, dutchExchangeProxy.address, etherToken.address, _token.address, 1, 1);
+      return deployer.deploy(
+        Pool,
+        dutchExchangeProxy.address,
+        etherToken.address,
+        _token.address,
+        1,
+        1
+      )
     })
     .then(_pool => {
-      pool = _pool;
-      
-      return deployer.deploy(PoolXCloneFactory, pool.address);
+      pool = _pool
+
+      return deployer.deploy(PoolXCloneFactory, pool.address)
     })
 
-  if (network === "development") {
+  if (network === 'development') {
     // const EtherToken = artifacts.require("EtherToken");
 
     deployerPromise = deployerPromise
@@ -56,29 +63,28 @@ module.exports = function(deployer, network, accounts) {
       //   return weth.deposit({ value: ETH_TEST_AMOUNT });
       // })
 
-      
       .then(() => Pool.deployed())
-      // .then(pool => {
-        
-      //   console.log('====================================');
-      //   console.log(pool);
-      //   console.log('====================================');
-      
-      //   return pool.deposit({from: accounts[0],value: ETH_TEST_AMOUNT});
-      // })
+    // .then(pool => {
 
-      // Deposit the WETH into the safe
-      // .then(() => Safe.deployed())
-      // .then(safe => {
-      //   console.log(
-      //     "Deposit %d WETH (%s) into the safe %s",
-      //     ETH_TEST_AMOUNT / 1e18,
-      //     EtherToken.address,
-      //     Safe.address
-      //   );
-      //   return safe.deposit(EtherToken.address, ETH_TEST_AMOUNT);
-      // });
+    //   console.log('====================================');
+    //   console.log(pool);
+    //   console.log('====================================');
+
+    //   return pool.deposit({from: accounts[0],value: ETH_TEST_AMOUNT});
+    // })
+
+    // Deposit the WETH into the safe
+    // .then(() => Safe.deployed())
+    // .then(safe => {
+    //   console.log(
+    //     "Deposit %d WETH (%s) into the safe %s",
+    //     ETH_TEST_AMOUNT / 1e18,
+    //     EtherToken.address,
+    //     Safe.address
+    //   );
+    //   return safe.deposit(EtherToken.address, ETH_TEST_AMOUNT);
+    // });
   }
 
-  return deployerPromise;
-};
+  return deployerPromise
+}

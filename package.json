@@ -11,9 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@gnosis.pm/dx-contracts": "file:../dx-contracts",
-    "@gnosis.pm/owl-token": "^2.0.0",
-    "@gnosis.pm/util-contracts": "^2.0.0",
+    "@gnosis.pm/dx-contracts": "2.0.0",
     "openzeppelin-solidity": "^2.1.3"
   },
   "devDependencies": {

@@ -6,6 +6,7 @@ const DutchExchange = artifacts.require('./DutchExchange.sol')
 // const PoolXCloneFactory = artifacts.require('./PoolXCloneFactory.sol')
 
 const { duration } = require('./helpers/timer')
+const should = require('chai').should()
 const {
   BN,
   balance,

@@ -157,7 +157,8 @@ contract('Pool', ([owner, contributor1]) => {
       )
       contributedTokenAmount2.should.be.bignumber.eq('0')
 
-      contributor1BalanceBefore.sub(gasCosts)
+      contributor1BalanceBefore
+        .sub(gasCosts)
         .should.be.bignumber.eq(contributor1BalanceAfter.sub(oneEth))
     })
 

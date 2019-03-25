@@ -52,23 +52,23 @@ contract('Pool', ([owner, contributor1]) => {
 
   describe('#contribute', () => {
     it('should deposit ether in the contract', async () => {
-      await pool.contribute(0, 0, { from: contributor1, value: oneEth })
-      const contributedTokenAmount1 = await pool.contributorToken1Amount(
+      await pool.contributeSellPool(0, 0, { from: contributor1, value: oneEth })
+      const contributedSellAmountToken1 = await pool.sellContributorToken1Amount(
         contributor1
       )
       const poolBalance = await balance.current(pool.address)
-      contributedTokenAmount1.should.be.bignumber.eq(oneEth)
+      contributedSellAmountToken1.should.be.bignumber.eq(oneEth)
       poolBalance.should.be.bignumber.eq(oneEth)
     })
 
     it('should deposit weth token in the contract', async () => {
       await weth.deposit({ from: contributor1, value: oneEth })
       await weth.approve(pool.address, oneEth, { from: contributor1 })
-      await pool.contribute(oneEth, 0, { from: contributor1 })
-      const contributedTokenAmount1 = await pool.contributorToken1Amount(
+      await pool.contributeSellPool(oneEth, 0, { from: contributor1 })
+      const contributedSellAmountToken1 = await pool.sellContributorToken1Amount(
         contributor1
       )
-      contributedTokenAmount1.should.be.bignumber.eq(oneEth)
+      contributedSellAmountToken1.should.be.bignumber.eq(oneEth)
       const auctionIndex = await dutchX.getAuctionIndex.call(
         weth.address,
         token.address
@@ -77,18 +77,21 @@ contract('Pool', ([owner, contributor1]) => {
     })
 
     it('should update the pool funds in USD ', async () => {
-      await pool.contribute(0, 0, { from: contributor1, value: oneEth })
+      await pool.contributeSellPool(0, 0, { from: contributor1, value: oneEth })
 
       const poolBalanceInUsd = await pool.getEthInUsd()
 
       poolBalanceInUsd.should.be.bignumber.eq('1100')
     })
 
-    it('should be able to list the token', async () => {
+    it.only('should be able to list the token', async () => {
       await weth.deposit({ from: contributor1, value: oneHundredEth })
-
       await weth.approve(pool.address, oneHundredEth, { from: contributor1 })
-      await pool.contribute(oneHundredEth, 0, { from: contributor1 })
+      await pool.contributeSellPool(oneEth, 0, { from: contributor1 })
+
+      await token.transfer(contributor1, oneHundredEth, { from: owner })
+      await token.approve(pool.address, oneHundredEth, { from: contributor1 })
+      await pool.contributeBuyPool(oneHundredEth, { from: contributor1 })
 
       // no more ether in pool contract
       const poolBalance = await web3.eth.getBalance(pool.address)
@@ -105,11 +108,12 @@ contract('Pool', ([owner, contributor1]) => {
     it('should be able to contribute in token2', async () => {
       await token.transfer(contributor1, oneEth, { from: owner })
       await token.approve(pool.address, oneEth, { from: contributor1 })
-      await pool.contribute(0, oneEth, { from: contributor1 })
-      const contributedTokenAmount2 = await pool.contributorToken2Amount(
+      await pool.contributeSellPool(0, oneEth, { from: contributor1 })
+      await pool.contributeBuyPool(0, oneEth, { from: contributor1 })
+      const contributedSellAmountToken2 = await pool.sellContributorToken2Amount(
         contributor1
       )
-      contributedTokenAmount2.should.be.bignumber.eq(oneEth)
+      contributedSellAmountToken2.should.be.bignumber.eq(oneEth)
       const auctionIndex = await dutchX.getAuctionIndex.call(
         weth.address,
         token.address
@@ -121,18 +125,20 @@ contract('Pool', ([owner, contributor1]) => {
       await weth.deposit({ from: contributor1, value: oneHundredEth })
 
       await weth.approve(pool.address, oneHundredEth, { from: contributor1 })
-      await pool.contribute(oneHundredEth, 0, { from: contributor1 })
+      await pool.contributeSellPool(oneHundredEth, 0, { from: contributor1 })
 
       await weth.deposit({ from: contributor1, value: oneEth })
 
       await weth.approve(pool.address, oneEth, { from: contributor1 })
-      shouldFail.reverting(pool.contribute(oneEth, 0, { from: contributor1 }))
+      shouldFail.reverting(
+        pool.contributeSellPool(oneEth, 0, { from: contributor1 })
+      )
     })
   })
 
   describe('#withdraw', () => {
     beforeEach(async () => {
-      await pool.contribute(0, 0, {
+      await pool.contributeSellPool(0, 0, {
         from: contributor1,
         value: oneEth,
       })
@@ -148,14 +154,14 @@ contract('Pool', ([owner, contributor1]) => {
       const gasPrice = new BN(tx.gasPrice)
       const gasCosts = gasUsed.mul(gasPrice)
 
-      const contributedTokenAmount1 = await pool.contributorToken1Amount(
+      const contributedSellAmountToken1 = await pool.sellContributorToken1Amount(
         contributor1
       )
-      contributedTokenAmount1.should.be.bignumber.eq('0')
-      const contributedTokenAmount2 = await pool.contributorToken2Amount(
+      contributedSellAmountToken1.should.be.bignumber.eq('0')
+      const contributedSellAmountToken2 = await pool.sellContributorToken2Amount(
         contributor1
       )
-      contributedTokenAmount2.should.be.bignumber.eq('0')
+      contributedSellAmountToken2.should.be.bignumber.eq('0')
 
       contributor1BalanceBefore
         .sub(gasCosts)
@@ -165,19 +171,19 @@ contract('Pool', ([owner, contributor1]) => {
     it('should withdraw weth from contract', async () => {
       await weth.deposit({ from: contributor1, value: oneEth })
       await weth.approve(pool.address, oneEth, { from: contributor1 })
-      await pool.contribute(oneEth, 0, { from: contributor1 })
+      await pool.contributeSellPool(oneEth, 0, { from: contributor1 })
       const contributor1BalanceBefore = await weth.balanceOf(contributor1)
       await pool.withdraw({ from: contributor1 })
       const contributor1BalanceAfter = await weth.balanceOf(contributor1)
 
-      const contributedTokenAmount1 = await pool.contributorToken1Amount(
+      const contributedSellAmountToken1 = await pool.sellContributorToken1Amount(
         contributor1
       )
-      contributedTokenAmount1.should.be.bignumber.eq('0')
-      const contributedTokenAmount2 = await pool.contributorToken2Amount(
+      contributedSellAmountToken1.should.be.bignumber.eq('0')
+      const contributedSellAmountToken2 = await pool.sellContributorToken2Amount(
         contributor1
       )
-      contributedTokenAmount2.should.be.bignumber.eq('0')
+      contributedSellAmountToken2.should.be.bignumber.eq('0')
 
       contributor1BalanceBefore
         .add(oneEth)
@@ -187,18 +193,18 @@ contract('Pool', ([owner, contributor1]) => {
     it('should withdraw token2 from contract', async () => {
       await token.transfer(contributor1, oneEth, { from: owner })
       await token.approve(pool.address, oneEth, { from: contributor1 })
-      await pool.contribute(0, oneEth, { from: contributor1 })
+      await pool.contributeSellPool(0, oneEth, { from: contributor1 })
       await pool.withdraw({ from: contributor1 })
       const contributor1BalanceAfter = await token.balanceOf(contributor1)
 
-      const contributedTokenAmount1 = await pool.contributorToken1Amount(
+      const contributedSellAmountToken1 = await pool.sellContributorToken1Amount(
         contributor1
       )
-      contributedTokenAmount1.should.be.bignumber.eq('0')
-      const contributedTokenAmount2 = await pool.contributorToken2Amount(
+      contributedSellAmountToken1.should.be.bignumber.eq('0')
+      const contributedSellAmountToken2 = await pool.sellContributorToken2Amount(
         contributor1
       )
-      contributedTokenAmount2.should.be.bignumber.eq('0')
+      contributedSellAmountToken2.should.be.bignumber.eq('0')
 
       oneEth.should.be.bignumber.eq(contributor1BalanceAfter)
     })
@@ -207,14 +213,14 @@ contract('Pool', ([owner, contributor1]) => {
       await weth.deposit({ from: contributor1, value: oneHundredEth })
 
       await weth.approve(pool.address, oneHundredEth, { from: contributor1 })
-      await pool.contribute(oneHundredEth, 0, { from: contributor1 })
+      await pool.contributeSellPool(oneHundredEth, 0, { from: contributor1 })
       shouldFail.reverting(pool.withdraw({ from: contributor1 }))
     })
   })
 
   describe('#collectFunds', () => {
     beforeEach(async () => {
-      await pool.contribute(0, 0, {
+      await pool.contributeSellPool(0, 0, {
         from: owner,
         value: oneHundredEth,
       })
@@ -297,7 +303,7 @@ contract('Pool', ([owner, contributor1]) => {
 
   describe('#claimFunds', () => {
     beforeEach(async () => {
-      await pool.contribute(0, 0, {
+      await pool.contributeSellPool(0, 0, {
         from: owner,
         value: oneHundredEth,
       })

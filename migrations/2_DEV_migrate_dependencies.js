@@ -1,4 +1,4 @@
-/* global artifacts */
+/* global artifacts, web3 */
 /* eslint no-undef: "error" */
 
 const migrateDx = require('@gnosis.pm/dx-contracts/src/migrations-truffle-5')

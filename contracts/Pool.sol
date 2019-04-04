@@ -10,14 +10,9 @@ import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 contract Pool {
     using SafeMath for uint256;
 
-    struct BuyPriceDefinition {
-        uint256 amount;
-        uint256 targetPrice;
-    }
-
     mapping (address => uint256) public sellContributorToken1Amount;
     mapping (address => uint256) public sellContributorToken2Amount;
-    mapping (address => BuyPriceDefinition[]) public buyContributorToken2Amount;
+    mapping (address => uint256) public buyContributorToken2Amount;
 
     uint256 public initialClosingPriceNum;
     uint256 public initialClosingPriceDen;
@@ -26,14 +21,15 @@ contract Pool {
     IEtherToken public token1;
     ERC20 public token2;
 
-    uint256 fundedBuyValueUSD = 0;
+//    uint256 fundedBuyValueUSD = 0;
 
     uint256 public token1SellBalance;
     uint256 public token2SellBalance;
+    uint256 public token2BuyBalance;
 
     uint256 public newToken1Balance;
     uint256 public newToken2Balance;
-    
+
 
     bool public isAuctionWithWeth = true;
 
@@ -49,7 +45,7 @@ contract Pool {
     modifier atStage(Stages _stage) {
         require(
             stage == _stage,
-            "Function can't be called at this time."
+            "Wrong stage for this function call."
         );
         _;
     }
@@ -84,7 +80,7 @@ contract Pool {
             token1 = IEtherToken(_token2);
             token2 = ERC20(_token1);
         } else {
-            token1 = ERC20(_token1);
+            token1 = IEtherToken(_token1);
             token2 = ERC20(_token2);
         }
 
@@ -154,8 +150,7 @@ contract Pool {
                 getEthInUsd()
             );
 
-        if (fundedValueUSD >= dx.thresholdNewTokenPair()
-            && fundedBuyValueUSD  >= dx.thresholdNewTokenPair()) {
+        if (fundedValueUSD >= dx.thresholdNewTokenPair()) {
             _addTokenPair();
         }
     }
@@ -163,36 +158,34 @@ contract Pool {
     /**
      * @dev Contribute to the buyer pool.
      */
-    function contributeBuyPool(uint256 buyWithToken2Amount, uint256 targetToken1Price) public payable atStage(Stages.Contribute) {
+    function contributeBuyPool(uint256 buyWithToken2Amount) public payable atStage(Stages.Collect) {
         require(
             msg.value == 0,
             "Don't send ether for buy side!"
         );
 
-        require(targetToken1Price > 500); // TODO greater than 1/2 of
-
         require(
             token2.transferFrom(address(msg.sender), address(this), buyWithToken2Amount),
             "Missing buyWithToken2Amount funds for contract!"
         );
-        
-        buyContributorToken2Amount[msg.sender].push(
-            new BuyPriceDefinition(buyWithToken2Amount, targetToken1Price)
-        );
-        
-        buyContributorToken2Amount[msg.sender].add(buyWithToken2Amount);
 
-        uint256 addedBuyValueUSD = isAuctionWithWeth
-            ? targetToken1Price.mul(getEthInUsd())
+        buyContributorToken2Amount[msg.sender] = buyContributorToken2Amount[msg.sender].add(buyWithToken2Amount);
+
+        //Events?
+
+        token2BuyBalance = token2BuyBalance.add(buyWithToken2Amount);
+
+/*        uint256 addedBuyValueUSD = isAuctionWithWeth ?
+            initialClosingPriceNum.div(initialClosingPriceDen).mul(getEthInUsd())
             : _calculateFundedValueTokenToken(
                 address(token1),
                 address(token2),
                 0,
-                token2BuyBalance,
+                buyWithToken2Amount,
                 getEthInUsd()
-            );
+            );*/
 
-        fundedBuyValueUSD = fundedBuyValueUSD.add(addedBuyValueUSD);
+//        fundedBuyValueUSD = fundedBuyValueUSD.add(addedBuyValueUSD);
     }
 
     function _calculateFundedValueTokenToken(
@@ -351,7 +344,7 @@ contract Pool {
                 newToken2Balance,
                 token1SellBalance
             );
-            sellContributorToken1Amount[msg.sender] = 0;            
+            sellContributorToken1Amount[msg.sender] = 0;
         }
 
         if (token2SellBalance > 0) {

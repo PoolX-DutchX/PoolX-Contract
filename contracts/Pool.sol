@@ -158,7 +158,7 @@ contract Pool {
     /**
      * @dev Contribute to the buyer pool.
      */
-    function contributeBuyPool(uint256 buyWithToken2Amount) public payable atStage(Stages.Collect) {
+    function contributeBuyPool(uint256 buyWithToken2Amount) public payable atStage(Stages.Contribute) {
         require(
             msg.value == 0,
             "Don't send ether for buy side!"

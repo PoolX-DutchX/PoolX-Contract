@@ -134,8 +134,8 @@ contract Pool {
         sellContributorToken1Amount[msg.sender] = sellContributorToken1Amount[msg.sender].add(contributeToken1).add(msg.value);
         sellContributorToken2Amount[msg.sender] = sellContributorToken2Amount[msg.sender].add(contributeToken2);
 
-        emit Contribute(msg.sender, address(token1), contributeToken1);
-        emit Contribute(msg.sender, address(token2), contributeToken2);
+        emit ContributeToSellPool(msg.sender, address(token1), contributeToken1);
+        emit ContributeToSellPool(msg.sender, address(token2), contributeToken2);
 
         token1SellBalance = token1SellBalance.add(contributeToken1).add(msg.value);
         token2SellBalance = token2SellBalance.add(contributeToken2);

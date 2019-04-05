@@ -171,7 +171,7 @@ contract Pool {
 
         buyContributorToken2Amount[msg.sender] = buyContributorToken2Amount[msg.sender].add(buyWithToken2Amount);
 
-        //Events?
+        emit ContributeToBuyPool(msg.sender, address(token2), buyWithToken2Amount);
 
         token2BuyBalance = token2BuyBalance.add(buyWithToken2Amount);
 
@@ -230,17 +230,14 @@ contract Pool {
         return fundedValueETH.mul(ethUSDPrice);
     }
 
-    function withdraw() external atStage(Stages.Contribute) {
-        require(
-            sellContributorToken1Amount[msg.sender] > 0 || sellContributorToken2Amount[msg.sender] > 0,
-            "No funds for user to withdraw!"
-        );
-
+    function withdrawFromSellPool() external atStage(Stages.Contribute) {
         uint256 contributedToken1 = sellContributorToken1Amount[msg.sender];
         uint256 contributedToken2 = sellContributorToken2Amount[msg.sender];
 
-        sellContributorToken1Amount[msg.sender] = 0;
-        sellContributorToken2Amount[msg.sender] = 0;
+        require(
+            contributedToken1 > 0 || contributedToken2 > 0,
+            "No funds for user to withdraw!"
+        );
 
         if (isAuctionWithWeth) {
             uint256 ethRefund = contributedToken1 > address(this).balance
@@ -253,10 +250,28 @@ contract Pool {
             token1.transfer(msg.sender, contributedToken1),
             "Contract has not enough funds of token1 for withdrawal!"
         );
+        sellContributorToken1Amount[msg.sender] = 0;
+
         require(
             token2.transfer(msg.sender, contributedToken2),
             "Contract has not enough funds of token2 for withdrawal!"
         );
+        sellContributorToken2Amount[msg.sender] = 0;
+    }
+
+    function withdrawFromBuyPool() external atStage(Stages.Collect) {
+        uint256 contributedToken2 = buyContributorToken2Amount[msg.sender];
+
+        require(
+            contributedToken2 > 0,
+            "No funds for user to withdraw!"
+        );
+
+        require(
+            token2.transfer(msg.sender, contributedToken2),
+            "Contract has not enough funds of token2 for withdrawal!"
+        );
+        buyContributorToken2Amount[msg.sender] = 0;
     }
 
     function _addTokenPair() private {
@@ -374,10 +389,16 @@ contract Pool {
     //     contribute(0, 0);
     // }
 
-    event Contribute(
+    event ContributeToSellPool(
          address sender,
          address token,
          uint256 amount
+    );
+
+    event ContributeToBuyPool(
+        address sender,
+        address token,
+        uint256 amount
     );
 
     event TokenPair(

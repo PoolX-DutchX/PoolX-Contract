@@ -6,7 +6,7 @@ import "../node_modules/@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInte
 import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
-/// @title Provides pooling for dutchX
+/// @title Pooling mechanism for DutchX
 contract Pool {
     using SafeMath for uint256;
 
@@ -21,15 +21,12 @@ contract Pool {
     IEtherToken public token1;
     ERC20 public token2;
 
-//    uint256 fundedBuyValueUSD = 0;
-
     uint256 public token1SellBalance;
     uint256 public token2SellBalance;
     uint256 public token2BuyBalance;
 
     uint256 public newToken1Balance;
     uint256 public newToken2Balance;
-
 
     bool public isAuctionWithWeth = true;
 
@@ -45,11 +42,17 @@ contract Pool {
     modifier atStage(Stages _stage) {
         require(
             stage == _stage,
-            "Wrong stage for this function call."
+            "Wrong pooling stage. Action not allowed."
         );
         _;
     }
 
+    /// @dev initialization function for a pool. Must be called to start an auction
+    /// @param _dx is the address of the DutchX exchange
+    /// @param _token1 is the address of the first ERC20 token or Wrapped eth (weth) in the token pair to be listed
+    /// @param _token2 is the address of the second ERC20 token or Wrapped eth (weth) in the token pair to be listed
+    /// @param initialClosingPriceNum initial price will be 2 * initialClosingPrice. This is its numerator
+    /// @param initialClosingPriceDen initial price will be 2 * initialClosingPrice. This is its denominator
     function init(
         address _dx,
         address payable _token1,
@@ -109,10 +112,12 @@ contract Pool {
         require(_token1 != _token2, "token1 and token2 must differ!");
     }
 
-    /**
-     * @dev Contribute to a Pool with ether. The stage is finished when ether worth 1000$
-     *      is collected and a dx token pair (token1/new token is created).
-     */
+
+    /// @dev Contribute to a Pool. The stage is finished when amount collected
+    ///  has a USD funded value higher than the DutchX tokenPair threshold.
+    ///  A dx token pair (token1/new token is created).
+    /// @param contributeToken1 is the amount of contribution with token1
+    /// @param contributeToken2 is the amount to contribute with token2
     function contributeSellPool(uint256 contributeToken1, uint256 contributeToken2) public payable atStage(Stages.Contribute)
     {
         if (!isAuctionWithWeth){
@@ -155,9 +160,9 @@ contract Pool {
         }
     }
 
-    /**
-     * @dev Contribute to the buyer pool.
-     */
+
+    /// @dev Contribute to the buyer pool.
+    /// @param buyWithToken2Amount is the amount to deposit for the buy side with token2
     function contributeBuyPool(uint256 buyWithToken2Amount) public payable atStage(Stages.Contribute) {
         require(
             msg.value == 0,
@@ -170,22 +175,9 @@ contract Pool {
         );
 
         buyContributorToken2Amount[msg.sender] = buyContributorToken2Amount[msg.sender].add(buyWithToken2Amount);
-
-        emit ContributeToBuyPool(msg.sender, address(token2), buyWithToken2Amount);
-
         token2BuyBalance = token2BuyBalance.add(buyWithToken2Amount);
 
-/*        uint256 addedBuyValueUSD = isAuctionWithWeth ?
-            initialClosingPriceNum.div(initialClosingPriceDen).mul(getEthInUsd())
-            : _calculateFundedValueTokenToken(
-                address(token1),
-                address(token2),
-                0,
-                buyWithToken2Amount,
-                getEthInUsd()
-            );*/
-
-//        fundedBuyValueUSD = fundedBuyValueUSD.add(addedBuyValueUSD);
+        emit ContributeToBuyPool(msg.sender, address(token2), buyWithToken2Amount);
     }
 
     function _calculateFundedValueTokenToken(
@@ -199,14 +191,12 @@ contract Pool {
         view
         returns (uint256)
     {
-        // We require ethToken-Token auctions to exist
-        // R3.1
+        // ethToken-Token auctions must exist
         require(
             dx.getAuctionIndex(_token1, dx.ethToken()) > 0,
             "No auction for token1 exists!"
         );
 
-        // R3.2
         require(
             dx.getAuctionIndex(_token2, dx.ethToken()) > 0,
             "No auction for token2 exists!"
@@ -230,6 +220,7 @@ contract Pool {
         return fundedValueETH.mul(ethUSDPrice);
     }
 
+    /// @dev Withdraw mechanism for the sell side. Must be still in the Contribute Stage
     function withdrawFromSellPool() external atStage(Stages.Contribute) {
         uint256 contributedToken1 = sellContributorToken1Amount[msg.sender];
         uint256 contributedToken2 = sellContributorToken2Amount[msg.sender];
@@ -259,6 +250,7 @@ contract Pool {
         sellContributorToken2Amount[msg.sender] = 0;
     }
 
+    /// @dev Withdraw mechanism for the buy side. Must be still in the Collect Stage
     function withdrawFromBuyPool() external atStage(Stages.Collect) {
         uint256 contributedToken2 = buyContributorToken2Amount[msg.sender];
 
@@ -299,9 +291,7 @@ contract Pool {
         emit TokenPair(address(token1), address(token2));
     }
 
-    /**
-     * @dev Collects the seller funds to the Pool. When successful, allows to collect share.
-     */
+    /// @dev Collects the seller funds to the Pool. When successful, allows to collect share.
     function collectFunds() external atStage(Stages.Collect) {
         stage = Stages.Claim;
         uint256 auctionIndex = dx.getAuctionIndex(address(token1), address(token2));
@@ -342,9 +332,7 @@ contract Pool {
         emit Claim(msg.sender, tokenShare);
     }
 
-    /**
-     * @dev contributors can claim their token share.
-     */
+    /// @dev contributors can claim their token share.
     function claimFunds() external atStage(Stages.Claim){
         require(
             sellContributorToken1Amount[msg.sender] > 0 ||
@@ -373,21 +361,12 @@ contract Pool {
         }
     }
 
-    /**
-     * @dev Get value of one ether in USD.
-     */
+    /// @dev Get value of one ether in USD.
     function getEthInUsd() public view returns (uint256) {
         PriceOracleInterface priceOracle = PriceOracleInterface(dx.ethUSDOracle());
         uint256 etherUsdPrice = priceOracle.getUSDETHPrice();
         return etherUsdPrice;
     }
-
-    // Commented because of errors in PoolCloneFactory - might relate to
-    // https://github.com/trufflesuite/truffle/issues/1640
-    // function() external payable {
-    //     require(msg.value > 0, "Please send ether to contribute!");
-    //     contribute(0, 0);
-    // }
 
     event ContributeToSellPool(
          address sender,

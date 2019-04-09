@@ -84,14 +84,14 @@ contract('Pool', ([owner, contributor1]) => {
       poolBalanceInUsd.should.be.bignumber.eq('1100')
     })
 
-    it.only('should be able to list the token', async () => {
-      await token.transfer(contributor1, oneHundredEth, { from: owner })
-      await token.approve(pool.address, oneHundredEth, { from: contributor1 })
-      await pool.contributeBuyPool(oneEth, { from: contributor1 })
-
+    it('should be able to list the token', async () => {
       await weth.deposit({ from: contributor1, value: oneHundredEth })
       await weth.approve(pool.address, oneHundredEth, { from: contributor1 })
       await pool.contributeSellPool(oneHundredEth, 0, { from: contributor1 })
+
+      await token.transfer(contributor1, oneHundredEth, { from: owner })
+      await token.approve(pool.address, oneHundredEth, { from: contributor1 })
+      await pool.contributeBuyPool(oneHundredEth, { from: contributor1 })
 
       // no more ether in pool contract
       const poolBalance = await web3.eth.getBalance(pool.address)

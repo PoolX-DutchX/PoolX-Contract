@@ -21,6 +21,9 @@ contract Pool {
     IEtherToken public token1;
     ERC20 public token2;
 
+    uint256 fundedValueUSD = 0;
+    uint256 fundedBuyValueUSD = 0;
+
     uint256 public token1SellBalance;
     uint256 public token2SellBalance;
     uint256 public token2BuyBalance;
@@ -29,6 +32,7 @@ contract Pool {
     uint256 public newToken2Balance;
 
     bool public isAuctionWithWeth = true;
+    bool public thresholdReached = false;
 
     Stages public stage = Stages.Initialize;
 
@@ -145,9 +149,9 @@ contract Pool {
         token1SellBalance = token1SellBalance.add(contributeToken1).add(msg.value);
         token2SellBalance = token2SellBalance.add(contributeToken2);
 
-        uint256 fundedValueUSD = isAuctionWithWeth ?
+        fundedValueUSD = isAuctionWithWeth ?
             token1SellBalance.mul(getEthInUsd())
-            : _calculateFundedValueTokenToken(
+            : _calculateFundedValueOfToken(
                 address(token1),
                 address(token2),
                 token1SellBalance,
@@ -155,8 +159,11 @@ contract Pool {
                 getEthInUsd()
             );
 
-        if (fundedValueUSD >= dx.thresholdNewTokenPair()) {
-            _addTokenPair();
+        if (fundedValueUSD >= dx.thresholdNewTokenPair()){
+            thresholdReached = true;
+            if (fundedBuyValueUSD >= fundedValueUSD) {
+                _addTokenPair();
+            }
         }
     }
 
@@ -175,12 +182,26 @@ contract Pool {
         );
 
         buyContributorToken2Amount[msg.sender] = buyContributorToken2Amount[msg.sender].add(buyWithToken2Amount);
-        token2BuyBalance = token2BuyBalance.add(buyWithToken2Amount);
 
         emit ContributeToBuyPool(msg.sender, address(token2), buyWithToken2Amount);
+
+        token2BuyBalance = token2BuyBalance.add(buyWithToken2Amount);
+        fundedBuyValueUSD = isAuctionWithWeth ?
+            token2BuyBalance.mul(getEthInUsd())
+            : _calculateFundedValueOfToken(
+                address(token1),
+                address(token2),
+                0,
+                token2BuyBalance,
+                getEthInUsd()
+            );
+
+        if (thresholdReached && fundedBuyValueUSD >= fundedValueUSD) {
+            _addTokenPair();
+        }
     }
 
-    function _calculateFundedValueTokenToken(
+    function _calculateFundedValueOfToken(
         address _token1,
         address _token2,
         uint token1Funding,
@@ -215,7 +236,7 @@ contract Pool {
         // Compute funded value in ethToken and USD
         // 10^30 * 10^30 = 10^60
         uint256 fundedValueETH = (token1Funding.mul(priceToken1Num).div(priceToken1Den))
-            .add(token2Funding * priceToken2Num / priceToken2Den);
+            .add(token2Funding.mul(priceToken2Num).div(priceToken2Den));
 
         return fundedValueETH.mul(ethUSDPrice);
     }

@@ -55,8 +55,8 @@ contract Pool {
     /// @param _dx is the address of the DutchX exchange
     /// @param _token1 is the address of the first ERC20 token or Wrapped eth (weth) in the token pair to be listed
     /// @param _token2 is the address of the second ERC20 token or Wrapped eth (weth) in the token pair to be listed
-    /// @param initialClosingPriceNum initial price will be 2 * initialClosingPrice. This is its numerator
-    /// @param initialClosingPriceDen initial price will be 2 * initialClosingPrice. This is its denominator
+    /// @param _initialClosingPriceNum initial price will be 2 * initialClosingPrice. This is its numerator
+    /// @param _initialClosingPriceDen initial price will be 2 * initialClosingPrice. This is its denominator
     function init(
         address _dx,
         address payable _token1,

@@ -109,7 +109,6 @@ contract('Pool', ([owner, contributor1]) => {
       await token.transfer(contributor1, oneEth, { from: owner })
       await token.approve(pool.address, oneEth, { from: contributor1 })
       await pool.contributeSellPool(0, oneEth, { from: contributor1 })
-      await pool.contributeBuyPool(0, oneEth, { from: contributor1 })
       const contributedSellAmountToken2 = await pool.sellContributorToken2Amount(
         contributor1
       )
@@ -164,6 +163,7 @@ contract('Pool', ([owner, contributor1]) => {
       contributedSellAmountToken2.should.be.bignumber.eq('0')
 
       contributor1BalanceBefore
+        .add(oneEth)
         .sub(gasCosts)
         .should.be.bignumber.eq(contributor1BalanceAfter)
     })

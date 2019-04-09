@@ -146,7 +146,7 @@ contract('Pool', ([owner, contributor1]) => {
 
     it('should withdraw eth token from contract', async () => {
       const contributor1BalanceBefore = await balance.current(contributor1)
-      const receipt = await pool.withdraw({ from: contributor1 })
+      const receipt = await pool.withdrawFromSellPool({ from: contributor1 })
       const contributor1BalanceAfter = await balance.current(contributor1)
 
       const tx = await web3.eth.getTransaction(receipt.tx)
@@ -173,7 +173,7 @@ contract('Pool', ([owner, contributor1]) => {
       await weth.approve(pool.address, oneEth, { from: contributor1 })
       await pool.contributeSellPool(oneEth, 0, { from: contributor1 })
       const contributor1BalanceBefore = await weth.balanceOf(contributor1)
-      await pool.withdraw({ from: contributor1 })
+      await pool.withdrawFromSellPool({ from: contributor1 })
       const contributor1BalanceAfter = await weth.balanceOf(contributor1)
 
       const contributedSellAmountToken1 = await pool.sellContributorToken1Amount(
@@ -194,7 +194,7 @@ contract('Pool', ([owner, contributor1]) => {
       await token.transfer(contributor1, oneEth, { from: owner })
       await token.approve(pool.address, oneEth, { from: contributor1 })
       await pool.contributeSellPool(0, oneEth, { from: contributor1 })
-      await pool.withdraw({ from: contributor1 })
+      await pool.withdrawFromSellPool({ from: contributor1 })
       const contributor1BalanceAfter = await token.balanceOf(contributor1)
 
       const contributedSellAmountToken1 = await pool.sellContributorToken1Amount(
@@ -214,7 +214,7 @@ contract('Pool', ([owner, contributor1]) => {
 
       await weth.approve(pool.address, oneHundredEth, { from: contributor1 })
       await pool.contributeSellPool(oneHundredEth, 0, { from: contributor1 })
-      shouldFail.reverting(pool.withdraw({ from: contributor1 }))
+      shouldFail.reverting(pool.withdrawFromSellPool({ from: contributor1 }))
     })
   })
 

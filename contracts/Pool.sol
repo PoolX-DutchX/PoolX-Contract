@@ -21,7 +21,7 @@ contract Pool {
     IEtherToken public token1;
     ERC20 public token2;
 
-    uint256 fundedValueUSD = 0;
+    uint256 fundedSellValueUSD = 0;
     uint256 fundedBuyValueUSD = 0;
 
     uint256 public token1SellBalance;
@@ -149,7 +149,7 @@ contract Pool {
         token1SellBalance = token1SellBalance.add(contributeToken1).add(msg.value);
         token2SellBalance = token2SellBalance.add(contributeToken2);
 
-        fundedValueUSD = isAuctionWithWeth ?
+        fundedSellValueUSD = isAuctionWithWeth ?
             token1SellBalance.mul(getEthInUsd())
             : _calculateFundedValueOfToken(
                 address(token1),
@@ -159,9 +159,9 @@ contract Pool {
                 getEthInUsd()
             );
 
-        if (fundedValueUSD >= dx.thresholdNewTokenPair()){
+        if (fundedSellValueUSD >= dx.thresholdNewTokenPair()){
             thresholdReached = true;
-            if (fundedBuyValueUSD >= fundedValueUSD) {
+            if (fundedBuyValueUSD >= fundedSellValueUSD) {
                 _addTokenPair();
             }
         }
@@ -196,7 +196,7 @@ contract Pool {
                 getEthInUsd()
             );
 
-        if (thresholdReached && fundedBuyValueUSD >= fundedValueUSD) {
+        if (thresholdReached && fundedBuyValueUSD >= fundedSellValueUSD) {
             _addTokenPair();
         }
     }

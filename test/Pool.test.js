@@ -165,7 +165,7 @@ contract('Pool', ([owner, contributor1]) => {
 
       contributor1BalanceBefore
         .sub(gasCosts)
-        .should.be.bignumber.eq(contributor1BalanceAfter)
+        .should.be.bignumber.eq(contributor1BalanceAfter.sub(oneEth))
     })
 
     it('should withdraw weth from contract', async () => {

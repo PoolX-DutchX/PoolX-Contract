@@ -49,9 +49,14 @@ function truffleConfig({
         gasPrice,
       },
     },
-    solc: {
-      optimizer: {
-        enabled: optimizedEnabled,
+    compilers: {
+      solc: {
+        version: '^0.5.2',
+        settings: {
+          optimizer: {
+            enabled: optimizedEnabled,
+          },
+        },
       },
     },
   }

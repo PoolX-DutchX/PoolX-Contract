@@ -145,7 +145,7 @@ contract Pool {
         token1Balance = token1Balance.add(contributeToken1).add(msg.value);
         token2Balance = token2Balance.add(contributeToken2);
 
-        fundedValueUSD = isAuctionWithWeth?
+        fundedValueUSD = isAuctionWithWeth ?
             token1Balance.mul(getEthInUsd())
             : _calculateFundedValueOfToken(
                 address(token1),
@@ -156,7 +156,29 @@ contract Pool {
             );
 
 
-        if (fundedValueUSD >= dx.thresholdNewTokenPair()) {
+        calculateImmediateAuctionRequirements();
+    }
+
+    function atleastZero(int a) internal pure returns (uint) {
+        if (a < 0) {
+            return 0;
+        } else {
+            return uint(a);
+        }
+    }
+
+    function calculateImmediateAuctionRequirements() public {
+        uint outstandingVolumeSoAuctionImmediatelyClears = atleastZero(
+            int(
+                token1Balance.mul(initialClosingPriceNum) / initialClosingPriceDen - token2Balance
+            )
+        );
+
+        if(
+            fundedValueUSD >= dx.thresholdNewTokenPair() &&
+            token2Balance >= outstandingVolumeSoAuctionImmediatelyClears
+        )
+        {
             _addTokenPair();
         }
     }
@@ -231,16 +253,19 @@ contract Pool {
         );
     }
 
-    /// @dev Collects the seller funds to the Pool. When successful, allows to collect share.
+    /// @dev Collects the funds to the Pool. Closes auction
     function collectFunds() external atStage(Stages.Collect) {
         stage = Stages.Claim;
         uint256 auctionIndex = dx.getAuctionIndex(address(token1), address(token2));
 
+        // post buy order
         token2.approve(address(dx), token2Balance);
         dx.deposit(address(token2), token2Balance);
         dx.postBuyOrder(address(token1), address(token2), auctionIndex, token2Balance);
 
+        // claim funds to pool
         dx.claimSellerFunds(address(token1), address(token2), address(this), 1);
+
         newToken1Balance = dx.balances(address(token1),address(this));
         newToken2Balance = dx.balances(address(token2),address(this));
 

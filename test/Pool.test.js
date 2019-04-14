@@ -6,13 +6,8 @@ const DutchExchange = artifacts.require('./DutchExchange.sol')
 // const PoolXCloneFactory = artifacts.require('./PoolXCloneFactory.sol')
 
 const { duration } = require('./helpers/timer')
-const {
-  BN,
-  balance,
-  shouldFail,
-  ether,
-  time,
-} = require('openzeppelin-test-helpers')
+const { ensuresException } = require('./helpers/exception')
+const { BN, balance, ether, time } = require('openzeppelin-test-helpers')
 
 const { expect } = require('chai')
 
@@ -22,8 +17,9 @@ contract('Pool', ([owner, contributor]) => {
   const initialClosingPriceDen = 1
   const oneEth = ether('1')
   const oneHundredEth = ether('100')
+
   beforeEach(async () => {
-    token = await Token.new(oneHundredEth)
+    token = await Token.new(ether('1000'))
     weth = await EtherToken.deployed()
     dx = await DutchExchangeProxy.deployed()
     dutchX = await DutchExchange.at(dx.address)
@@ -142,7 +138,13 @@ contract('Pool', ([owner, contributor]) => {
 
       await weth.deposit({ from: contributor, value: oneEth })
       await weth.approve(pool.address, oneEth, { from: contributor })
-      shouldFail.reverting(pool.contribute(oneEth, 0, { from: contributor }))
+
+      try {
+        await pool.contribute(oneEth, 0, { from: contributor })
+        assert.fail()
+      } catch (e) {
+        ensuresException(e)
+      }
     })
   })
 
@@ -227,29 +229,39 @@ contract('Pool', ([owner, contributor]) => {
       await weth.deposit({ from: contributor, value: oneHundredEth })
       await weth.approve(pool.address, oneHundredEth, { from: contributor })
 
-      await token.transfer(contributor, oneHundredEth, { from: owner })
-      await token.approve(pool.address, oneHundredEth, { from: contributor })
+      await token.transfer(contributor, ether('200'), { from: owner })
+      await token.approve(pool.address, ether('200'), { from: contributor })
 
-      await pool.contribute(oneHundredEth, oneHundredEth, {
+      await pool.contribute(oneHundredEth, ether('200'), {
         from: contributor,
       })
 
-      shouldFail.reverting(pool.withdraw({ from: contributor }))
+      try {
+        await pool.withdraw({ from: contributor })
+        assert.fail()
+      } catch (e) {
+        ensuresException(e)
+      }
     })
   })
 
   describe('#collectFunds', () => {
     beforeEach(async () => {
-      await token.approve(pool.address, oneHundredEth, { from: owner })
+      await token.approve(pool.address, ether('200'), { from: owner })
 
-      await pool.contribute(0, oneHundredEth, {
+      await pool.contribute(0, ether('200'), {
         from: owner,
         value: oneHundredEth,
       })
     })
 
     it('should not work before Auction starts', async () => {
-      shouldFail.reverting(pool.collectFunds())
+      try {
+        await pool.collectFunds()
+        assert.fail()
+      } catch (e) {
+        ensuresException(e)
+      }
     })
 
     it('should not work when funds are already collected', async () => {
@@ -258,11 +270,16 @@ contract('Pool', ([owner, contributor]) => {
         token.address
       )).toNumber()
 
-      await time.increaseTo(auctionStart + duration.hours(14))
-      await time.increaseTo(auctionStart + duration.hours(15))
+      await time.increaseTo(auctionStart + duration.hours(30))
 
       await pool.collectFunds()
-      shouldFail.reverting(pool.collectFunds())
+
+      try {
+        await pool.collectFunds()
+        assert.fail()
+      } catch (e) {
+        ensuresException(e)
+      }
     })
 
     it('should be able to collect funds', async () => {
@@ -271,17 +288,26 @@ contract('Pool', ([owner, contributor]) => {
         token.address
       )).toNumber()
 
-      await time.increaseTo(auctionStart + duration.hours(14))
+      await time.increaseTo(auctionStart + duration.hours(30))
 
-      let poolBalance = await token.balanceOf(pool.address)
-      expect(poolBalance).to.be.bignumber.eq(ether('100')) // token2Balance still in pool
+      let auctionIndex = await dutchX.getAuctionIndex.call(
+        weth.address,
+        token.address
+      )
+      expect(auctionIndex).to.be.bignumber.eq('1') // still in first auction
 
-      await time.increaseTo(auctionStart + duration.hours(15))
       await pool.collectFunds()
 
-      poolBalance = await token.balanceOf(pool.address)
+      auctionIndex = await dutchX.getAuctionIndex.call(
+        weth.address,
+        token.address
+      )
+      expect(auctionIndex).to.be.bignumber.eq('2') // first auction is finished. Index incremented.
+
+      const poolBalance = await token.balanceOf(pool.address)
 
       assert(poolBalance.gt(0))
+      expect(poolBalance).to.be.bignumber.eq(ether('200')) // token2Balance or buyside funds are back in the pool
     })
   })
 
@@ -300,12 +326,16 @@ contract('Pool', ([owner, contributor]) => {
         token.address
       )).toNumber()
 
-      await time.increaseTo(auctionStart + duration.hours(14))
-      await time.increaseTo(auctionStart + duration.hours(15))
+      await time.increaseTo(auctionStart + duration.hours(30))
     })
 
     it('should not work when funds are NOT collected', async () => {
-      shouldFail.reverting(pool.claimFunds())
+      try {
+        await pool.claimFunds()
+        assert.fail()
+      } catch (e) {
+        ensuresException(e)
+      }
     })
 
     it('should not be possible to claim second time', async () => {
@@ -315,7 +345,13 @@ contract('Pool', ([owner, contributor]) => {
       expect(contributorBalance).to.be.bignumber.eq('0')
 
       await pool.claimFunds({ from: contributor })
-      shouldFail.reverting(pool.claimFunds())
+
+      try {
+        await pool.claimFunds()
+        assert.fail()
+      } catch (e) {
+        ensuresException(e)
+      }
 
       contributorBalance = await token.balanceOf(contributor)
       assert(contributorBalance.gt(0))

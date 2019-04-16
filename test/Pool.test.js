@@ -3,7 +3,6 @@ const Token = artifacts.require('./TokenGNO.sol')
 const EtherToken = artifacts.require('./EtherToken.sol')
 const DutchExchangeProxy = artifacts.require('./DutchExchangeProxy.sol')
 const DutchExchange = artifacts.require('./DutchExchange.sol')
-// const PoolXCloneFactory = artifacts.require('./PoolXCloneFactory.sol')
 
 const { duration } = require('./helpers/timer')
 const { ensuresException } = require('./helpers/exception')
@@ -17,6 +16,20 @@ contract('Pool', ([owner, contributor]) => {
   const initialClosingPriceDen = 1
   const oneEth = ether('1')
   const oneHundredEth = ether('100')
+
+  async function listToken() {
+    // weth sell side
+    await weth.deposit({ from: contributor, value: oneHundredEth })
+    await weth.approve(pool.address, oneHundredEth, { from: contributor })
+
+    // token buy side
+    await token.transfer(contributor, oneHundredEth, { from: owner })
+    await token.approve(pool.address, oneHundredEth, { from: contributor })
+
+    await pool.contribute(oneHundredEth, oneHundredEth, {
+      from: contributor,
+    })
+  }
 
   beforeEach(async () => {
     token = await Token.new(ether('1000'))
@@ -32,20 +45,6 @@ contract('Pool', ([owner, contributor]) => {
       initialClosingPriceNum,
       initialClosingPriceDen
     )
-
-    // poolCloneFactory = await PoolXCloneFactory.deployed(pool.address)
-
-    // clonedPool = await poolCloneFactory
-    //   .createPool(
-    //     dx.address,
-    //     weth.address,
-    //     token.address,
-    //     initialClosingPriceNum,
-    //     initialClosingPriceDen
-    //   )
-    //   .then(tx => Pool.at(tx.logs[0].args.newPoolAddress))
-
-    // await token.transfer(pool.address, oneEth);
   })
 
   describe('#contribute', () => {
@@ -83,17 +82,7 @@ contract('Pool', ([owner, contributor]) => {
     })
 
     it('should be able to list the token', async () => {
-      // weth sell side
-      await weth.deposit({ from: contributor, value: oneHundredEth })
-      await weth.approve(pool.address, oneHundredEth, { from: contributor })
-
-      // token buy side
-      await token.transfer(contributor, oneHundredEth, { from: owner })
-      await token.approve(pool.address, oneHundredEth, { from: contributor })
-
-      await pool.contribute(oneHundredEth, oneHundredEth, {
-        from: contributor,
-      })
+      await listToken()
 
       // no more ether in pool contract
       const poolBalance = await web3.eth.getBalance(pool.address)
@@ -126,15 +115,7 @@ contract('Pool', ([owner, contributor]) => {
     })
 
     it('should not be able to contribute after start', async () => {
-      await weth.deposit({ from: contributor, value: oneHundredEth })
-      await weth.approve(pool.address, oneHundredEth, { from: contributor })
-
-      await token.transfer(contributor, oneHundredEth, { from: owner })
-      await token.approve(pool.address, oneHundredEth, { from: contributor })
-      // first contribution meets the requirements
-      await pool.contribute(oneHundredEth, oneHundredEth, {
-        from: contributor,
-      })
+      await listToken()
 
       await weth.deposit({ from: contributor, value: oneEth })
       await weth.approve(pool.address, oneEth, { from: contributor })
@@ -149,14 +130,11 @@ contract('Pool', ([owner, contributor]) => {
   })
 
   describe('#withdraw', () => {
-    beforeEach(async () => {
+    it('should withdraw eth token from contract', async () => {
       await pool.contribute(0, 0, {
         from: contributor,
         value: oneEth,
       })
-    })
-
-    it('should withdraw eth token from contract', async () => {
       const contributorBalanceBefore = await balance.current(contributor)
       const receipt = await pool.withdraw({ from: contributor })
       const contributorBalanceAfter = await balance.current(contributor)
@@ -226,15 +204,7 @@ contract('Pool', ([owner, contributor]) => {
     })
 
     it('should not be able to withdraw when token is added to dx', async () => {
-      await weth.deposit({ from: contributor, value: oneHundredEth })
-      await weth.approve(pool.address, oneHundredEth, { from: contributor })
-
-      await token.transfer(contributor, ether('200'), { from: owner })
-      await token.approve(pool.address, ether('200'), { from: contributor })
-
-      await pool.contribute(oneHundredEth, ether('200'), {
-        from: contributor,
-      })
+      await listToken()
 
       try {
         await pool.withdraw({ from: contributor })
@@ -247,12 +217,7 @@ contract('Pool', ([owner, contributor]) => {
 
   describe('#collectFunds', () => {
     beforeEach(async () => {
-      await token.approve(pool.address, ether('200'), { from: owner })
-
-      await pool.contribute(0, ether('200'), {
-        from: owner,
-        value: oneHundredEth,
-      })
+      await listToken()
     })
 
     it('should not work before Auction starts', async () => {
@@ -307,7 +272,7 @@ contract('Pool', ([owner, contributor]) => {
       const poolBalance = await token.balanceOf(pool.address)
 
       assert(poolBalance.gt(0))
-      expect(poolBalance).to.be.bignumber.eq(ether('200')) // token2Balance or buyside funds are back in the pool
+      expect(poolBalance).to.be.bignumber.eq(oneHundredEth) // token2Balance or buyside funds are back in the pool
     })
   })
 

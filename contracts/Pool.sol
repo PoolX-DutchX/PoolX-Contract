@@ -20,8 +20,6 @@ contract Pool {
     IEtherToken public token1;
     ERC20 public token2;
 
-    uint256 fundedValueUSD;
-
     uint256 public token1Balance;
     uint256 public token2Balance;
 
@@ -145,82 +143,50 @@ contract Pool {
         token1Balance = token1Balance.add(contributeToken1).add(msg.value);
         token2Balance = token2Balance.add(contributeToken2);
 
-        fundedValueUSD = isAuctionWithWeth ?
-            token1Balance.mul(getEthInUsd())
-            : _calculateFundedValueOfToken(
-                address(token1),
-                address(token2),
-                token1Balance,
-                token2Balance,
-                getEthInUsd()
-            );
-
-
-        calculateImmediateAuctionRequirements();
-    }
-
-    function atleastZero(int a) internal pure returns (uint) {
-        if (a < 0) {
-            return 0;
-        } else {
-            return uint(a);
-        }
-    }
-
-    function calculateImmediateAuctionRequirements() public {
-        uint outstandingVolumeSoAuctionImmediatelyClears = atleastZero(
-            int(
-                token1Balance.mul(initialClosingPriceNum) / initialClosingPriceDen - token2Balance
-            )
+        uint256 fundedValueOfSellSide = _calculateFundedValueOfToken(
+            address(token1),
+            token1Balance
         );
 
-        if(
-            fundedValueUSD >= dx.thresholdNewTokenPair() &&
-            token2Balance >= outstandingVolumeSoAuctionImmediatelyClears
-        )
-        {
+        uint256 fundedValueOfBuySide = _calculateFundedValueOfToken(
+            address(token2),
+            token2Balance
+        );
+
+        if (fundedValueOfSellSide >= dx.thresholdNewTokenPair() && fundedValueOfSellSide == fundedValueOfBuySide) {
             _addTokenPair();
         }
     }
 
     function _calculateFundedValueOfToken(
-        address _token1,
-        address _token2,
-        uint token1Funding,
-        uint token2Funding,
-        uint ethUSDPrice
+        address _token,
+        uint256 _tokenFunding
     )
         private
         view
         returns (uint256)
     {
-        // DutchX requires ethToken-Token auctions to exist
-        require(
-            dx.getAuctionIndex(_token1, dx.ethToken()) > 0,
-            "No auction for token1 exists!"
-        );
+        uint256 fundedValue = 0;
+        if (isAuctionWithWeth) {
+            fundedValue = _tokenFunding.mul(getEthInUsd());
+        } else {
+            // DutchX requires ethToken-Token auctions to exist
+            require(
+                dx.getAuctionIndex(_token, dx.ethToken()) > 0,
+                "There is no auction for this token!"
+            );
 
-        require(
-            dx.getAuctionIndex(_token2, dx.ethToken()) > 0,
-            "No auction for token2 exists!"
-        );
+            // Price of Token
+            uint256 priceTokenNum;
+            uint256 priceTokenDen;
+            (priceTokenNum, priceTokenDen) = dx.getPriceOfTokenInLastAuction(_token);
 
-        // Price of Token 1
-        uint256 priceToken1Num;
-        uint256 priceToken1Den;
-        (priceToken1Num, priceToken1Den) = dx.getPriceOfTokenInLastAuction(_token1);
-
-        // Price of Token 2
-        uint256 priceToken2Num;
-        uint256 priceToken2Den;
-        (priceToken2Num, priceToken2Den) = dx.getPriceOfTokenInLastAuction(_token2);
-
-        // Compute funded value in ethToken and USD
-        // 10^30 * 10^30 = 10^60
-        uint256 fundedValueETH = (token1Funding.mul(priceToken1Num).div(priceToken1Den))
-            .add(token2Funding.mul(priceToken2Num).div(priceToken2Den));
-
-        return fundedValueETH.mul(ethUSDPrice);
+            // Compute funded value in ethToken and USD
+            // 10^30 * 10^30 = 10^60
+            uint256 fundedValueETH = _tokenFunding.mul(priceTokenNum).div(priceTokenDen);
+            fundedValue = fundedValueETH.mul(getEthInUsd());
+        }
+        return fundedValue;
     }
 
     /// @dev Withdraw mechanism for the sell side. Must be in Contribute Stage

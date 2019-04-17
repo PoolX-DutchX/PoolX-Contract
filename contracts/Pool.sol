@@ -160,7 +160,7 @@ contract Pool {
 
     function _calculateFundedValueOfToken(
         address _token,
-        uint256 _tokenFunding
+        uint256 _tokenBalance
     )
         private
         view
@@ -168,7 +168,7 @@ contract Pool {
     {
         uint256 fundedValue = 0;
         if (isAuctionWithWeth) {
-            fundedValue = _tokenFunding.mul(getEthInUsd());
+            fundedValue = _tokenBalance.mul(getEthInUsd());
         } else {
             // DutchX requires ethToken-Token auctions to exist
             require(
@@ -183,7 +183,7 @@ contract Pool {
 
             // Compute funded value in ethToken and USD
             // 10^30 * 10^30 = 10^60
-            uint256 fundedValueETH = _tokenFunding.mul(priceTokenNum).div(priceTokenDen);
+            uint256 fundedValueETH = _tokenBalance.mul(priceTokenNum).div(priceTokenDen);
             fundedValue = fundedValueETH.mul(getEthInUsd());
         }
         return fundedValue;

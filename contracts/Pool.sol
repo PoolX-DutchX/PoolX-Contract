@@ -26,6 +26,9 @@ contract Pool {
     uint256 public newToken1Balance;
     uint256 public newToken2Balance;
 
+    uint256 public fundedValueOfToken1;
+    uint256 public fundedValueOfToken2;
+
     bool public isAuctionWithWeth;
 
     Stages public stage = Stages.Initialize;
@@ -143,17 +146,17 @@ contract Pool {
         token1Balance = token1Balance.add(contributeToken1).add(msg.value);
         token2Balance = token2Balance.add(contributeToken2);
 
-        uint256 fundedValueOfSellSide = _calculateFundedValueOfToken(
+        fundedValueOfToken1 = fundedValueOfToken1.add(_calculateFundedValueOfToken(
             address(token1),
             token1Balance
-        );
+        ));
 
-        uint256 fundedValueOfBuySide = _calculateFundedValueOfToken(
+        fundedValueOfToken2 = fundedValueOfToken2.add(_calculateFundedValueOfToken(
             address(token2),
             token2Balance
-        );
+        ));
 
-        if (fundedValueOfSellSide >= dx.thresholdNewTokenPair() && fundedValueOfSellSide == fundedValueOfBuySide) {
+        if (fundedValueOfToken1 >= dx.thresholdNewTokenPair() && fundedValueOfToken1 == fundedValueOfToken2) {
             _addTokenPair();
         }
     }

@@ -16,6 +16,7 @@ contract('Pool', ([owner, contributor]) => {
   const initialClosingPriceDen = 1
   const oneEth = ether('1')
   const oneHundredEth = ether('100')
+  const twoHundredEth = ether('200')
 
   async function listToken() {
     // weth sell side
@@ -23,10 +24,10 @@ contract('Pool', ([owner, contributor]) => {
     await weth.approve(pool.address, oneHundredEth, { from: contributor })
 
     // token buy side
-    await token.transfer(contributor, oneHundredEth, { from: owner })
-    await token.approve(pool.address, oneHundredEth, { from: contributor })
+    await token.transfer(contributor, twoHundredEth, { from: owner })
+    await token.approve(pool.address, twoHundredEth, { from: contributor })
 
-    await pool.contribute(oneHundredEth, oneHundredEth, {
+    await pool.contribute(oneHundredEth, twoHundredEth, {
       from: contributor,
     })
   }
@@ -272,16 +273,16 @@ contract('Pool', ([owner, contributor]) => {
       const poolBalance = await token.balanceOf(pool.address)
 
       assert(poolBalance.gt(0))
-      expect(poolBalance).to.be.bignumber.eq(oneHundredEth) // token2Balance or buyside funds are back in the pool
+      expect(poolBalance).to.be.bignumber.eq(twoHundredEth) // token2Balance or buyside funds are back in the pool
     })
   })
 
   describe('#claimFunds', () => {
     beforeEach(async () => {
-      await token.transfer(contributor, oneHundredEth, { from: owner })
-      await token.approve(pool.address, oneHundredEth, { from: contributor })
+      await token.transfer(contributor, twoHundredEth, { from: owner })
+      await token.approve(pool.address, twoHundredEth, { from: contributor })
 
-      await pool.contribute(0, oneHundredEth, {
+      await pool.contribute(0, twoHundredEth, {
         from: contributor,
         value: oneHundredEth,
       })

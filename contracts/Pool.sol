@@ -175,7 +175,7 @@ contract Pool {
 
     function _calculateFundedValueForListedToken(ERC20 _token, uint256 _tokenBalance)
         private view
-        returns (uint256 fundedValueUSD)
+        returns (uint256)
     {
         uint256 priceTokenNum;
         uint256 priceTokenDen;

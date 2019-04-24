@@ -134,13 +134,15 @@ contract Pool {
             "Missing contributeToken2 funds for contract!"
         );
 
-        contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].add(contributeToken1).add(msg.value);
+        uint256 senderContributeToken1Amount = contributeToken1.add(msg.value);
+
+        contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].add(senderContributeToken1Amount);
         contributorToken2Amount[msg.sender] = contributorToken2Amount[msg.sender].add(contributeToken2);
 
-        emit Contribute(msg.sender, address(token1), contributeToken1);
+        emit Contribute(msg.sender, address(token1), senderContributeToken1Amount);
         emit Contribute(msg.sender, address(token2), contributeToken2);
 
-        token1Balance = token1Balance.add(contributeToken1).add(msg.value);
+        token1Balance = token1Balance.add(senderContributeToken1Amount);
         token2Balance = token2Balance.add(contributeToken2);
 
         if (_thresholdIsReached()) {
@@ -154,8 +156,8 @@ contract Pool {
 
         if (isAuctionWithWeth) {
             token1FundedValueUSD = token1Balance.mul(getEthInUsd());
-            uint256 fundedValueETH = token2Balance.mul(initialClosingPriceDen).div(initialClosingPriceNum);
-            token2FundedValueUSD = fundedValueETH.mul(getEthInUsd());
+            uint256 token2FundedValueETH = token2Balance.mul(initialClosingPriceDen).div(initialClosingPriceNum);
+            token2FundedValueUSD = token2FundedValueETH.mul(getEthInUsd());
         } else {
             // DutchX requires ethToken-Token auctions to exist
             require(
@@ -166,14 +168,14 @@ contract Pool {
                 dx.getAuctionIndex(address(token2), dx.ethToken()) > 0,
                 "No WETH in the pair and no WETH auction for token2!"
             );
-            token1FundedValueUSD = _calculateFundedValueForListedToken(token1, token1Balance);
-            token2FundedValueUSD = _calculateFundedValueForListedToken(token2, token2Balance);
+            token1FundedValueUSD = _calculateUSDFundedValueForListedToken(token1, token1Balance);
+            token2FundedValueUSD = _calculateUSDFundedValueForListedToken(token2, token2Balance);
         }
         return (token1FundedValueUSD >= dx.thresholdNewTokenPair() &&
                 token1FundedValueUSD == token2FundedValueUSD);
     }
 
-    function _calculateFundedValueForListedToken(ERC20 _token, uint256 _tokenBalance)
+    function _calculateUSDFundedValueForListedToken(ERC20 _token, uint256 _tokenBalance)
         private view
         returns (uint256)
     {
@@ -181,7 +183,8 @@ contract Pool {
         uint256 priceTokenDen;
         (priceTokenNum, priceTokenDen) = dx.getPriceOfTokenInLastAuction(address(_token));
         uint256 fundedValueETH = _tokenBalance.mul(priceTokenNum).div(priceTokenDen);
-        fundedValueETH.mul(getEthInUsd());
+
+        return fundedValueETH.mul(getEthInUsd());
     }
 
     /// @dev Withdraw mechanism for the sell side. Must be in Contribute Stage

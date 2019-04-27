@@ -10,6 +10,10 @@ import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 contract Pool {
     using SafeMath for uint256;
 
+    // TODO remove
+    uint256 public refundETHToken1;
+    uint256 public refundETHToken2;
+
     mapping (address => uint256) public contributorToken1Amount;
     mapping (address => uint256) public contributorToken2Amount;
 
@@ -27,6 +31,8 @@ contract Pool {
     uint256 public newToken2Balance;
 
     bool public isAuctionWithWeth;
+    bool public token1ThresholdReached;
+    bool public token2ThresholdReached;
 
     Stages public stage = Stages.Initialize;
 
@@ -80,8 +86,11 @@ contract Pool {
         if (dx.ethToken() == _token2) {
             token1 = IEtherToken(_token2);
             token2 = ERC20(_token1);
-        } else {
+        } else if (isAuctionWithWeth) {
             token1 = IEtherToken(_token1);
+            token2 = ERC20(_token2);
+        } else {
+            token1 = ERC20(_token1);
             token2 = ERC20(_token2);
         }
 
@@ -110,7 +119,6 @@ contract Pool {
         require(_token1 != _token2, "token1 and token2 must differ!");
     }
 
-
     /// @dev Contribute to a Pool. The stage is finished when amount collected
     ///  has a USD funded value higher than the DutchX tokenPair threshold.
     ///  A dx token pair (token1/new token is created).
@@ -118,12 +126,20 @@ contract Pool {
     /// @param contributeToken2 is the amount to contribute with token2
     function contribute(uint256 contributeToken1, uint256 contributeToken2) public payable atStage(Stages.Contribute)
     {
-        if (!isAuctionWithWeth){
-            require(
-                msg.value == 0,
-                "Don't send ether for token pairs without Weth!"
-            );
-        }
+        require(
+            msg.value == 0,
+            "Don't send ether, use WETH for auctions with ether!"
+        );
+
+        require(
+            contributeToken1 == 0 || !token1ThresholdReached,
+            "Don't send token1, threshold is reached!"
+        );
+
+        require(
+            contributeToken2 == 0 || !token2ThresholdReached,
+            "Don't send token2, threshold is reached!"
+        );
 
         require(
             token1.transferFrom(address(msg.sender), address(this), contributeToken1),
@@ -134,15 +150,13 @@ contract Pool {
             "Missing contributeToken2 funds for contract!"
         );
 
-        uint256 senderContributeToken1Amount = contributeToken1.add(msg.value);
-
-        contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].add(senderContributeToken1Amount);
+        contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].add(contributeToken1);
         contributorToken2Amount[msg.sender] = contributorToken2Amount[msg.sender].add(contributeToken2);
 
-        emit Contribute(msg.sender, address(token1), senderContributeToken1Amount);
+        emit Contribute(msg.sender, address(token1), contributeToken1);
         emit Contribute(msg.sender, address(token2), contributeToken2);
 
-        token1Balance = token1Balance.add(senderContributeToken1Amount);
+        token1Balance = token1Balance.add(contributeToken1);
         token2Balance = token2Balance.add(contributeToken2);
 
         if (_thresholdIsReached()) {
@@ -150,16 +164,19 @@ contract Pool {
         }
     }
 
-    function _thresholdIsReached() private view returns (bool) {
+    function buyAndCollect() public atStage(Stages.Collect) {
+        _buyTokens();
+        _collectFunds();
+
+        stage = Stages.Claim;
+    }
+
+    function _thresholdIsReached() private returns (bool) {
         uint256 token1FundedValueUSD;
         uint256 token2FundedValueUSD;
 
-        if (isAuctionWithWeth) {
-            token1FundedValueUSD = token1Balance.mul(getEthInUsd());
-            uint256 token2FundedValueETH = token2Balance.mul(initialClosingPriceDen).div(initialClosingPriceNum);
-            token2FundedValueUSD = token2FundedValueETH.mul(getEthInUsd());
-        } else {
-            // DutchX requires ethToken-Token auctions to exist
+        // DutchX requires ethToken-Token auctions to exist
+        if (!isAuctionWithWeth) {
             require(
                 dx.getAuctionIndex(address(token1), dx.ethToken()) > 0,
                 "No WETH in the pair and no WETH auction for token1!"
@@ -168,15 +185,88 @@ contract Pool {
                 dx.getAuctionIndex(address(token2), dx.ethToken()) > 0,
                 "No WETH in the pair and no WETH auction for token2!"
             );
-            token1FundedValueUSD = _calculateUSDFundedValueForListedToken(token1, token1Balance);
-            token2FundedValueUSD = _calculateUSDFundedValueForListedToken(token2, token2Balance);
         }
-        return (token1FundedValueUSD >= dx.thresholdNewTokenPair() &&
-                token1FundedValueUSD == token2FundedValueUSD);
+        
+        token1FundedValueUSD = isAuctionWithWeth
+            ? token1Balance.mul(getEthInUsd())
+            : _calculateUSDFundedValueForListedToken(token1, token1Balance);
+
+        uint256 token2FundedValueETH = token2Balance
+            .mul(initialClosingPriceNum)
+            .div(initialClosingPriceDen);
+        token2FundedValueUSD = token2FundedValueETH.mul(getEthInUsd());
+
+        if (!token1ThresholdReached && token1FundedValueUSD >= dx.thresholdNewTokenPair()) {
+            token1ThresholdReached = true;
+
+            uint256 refund = _refundTokenAboveThreshold(
+                token1,
+                token1FundedValueUSD,
+                false
+            );
+
+            token1Balance = token1Balance.sub(refund);
+            contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].sub(refund);
+        }
+
+        if (!token2ThresholdReached && token2FundedValueUSD >= dx.thresholdNewTokenPair()) {
+            token2ThresholdReached = true;
+            uint256 refund = _refundTokenAboveThreshold(
+                token2,
+                token2FundedValueUSD,
+                true
+            );
+
+            token2Balance = token2Balance.sub(refund);
+            contributorToken2Amount[msg.sender] = contributorToken2Amount[msg.sender].sub(refund);
+        }
+
+        return token1ThresholdReached && token2ThresholdReached;
+    }
+
+    function _refundTokenAboveThreshold(
+        ERC20 _token,
+        uint256 fundedValueUSD,
+        bool isToken2
+    )
+        private
+        returns (uint256)
+    {
+        uint256 refundUSD = fundedValueUSD.sub(dx.thresholdNewTokenPair());
+        uint256 refundETH = refundUSD.div(getEthInUsd());
+
+        if (!isAuctionWithWeth && !isToken2) {
+            uint256 priceTokenNum;
+            uint256 priceTokenDen;
+            (priceTokenNum, priceTokenDen) = dx.getPriceOfTokenInLastAuction(address(_token));
+            refundETH = refundETH.mul(priceTokenDen).div(priceTokenNum);
+        } else if (isToken2) {
+            refundETH = refundETH
+                .mul(initialClosingPriceDen)
+                .div(initialClosingPriceNum.mul(2));
+        }
+
+        if (isToken2) {
+            refundETHToken2 = refundETH;
+        } else {
+            refundETHToken1 = refundETH;
+        }
+
+        require(refundETH <= _token.balanceOf(address(this)), 'Pool cant refund!');
+
+        if (refundETH > 0) {
+            require(
+                _token.transfer(msg.sender, refundETH),
+                "Token refund failed!"
+            );
+        }
+
+        return refundETH;
     }
 
     function _calculateUSDFundedValueForListedToken(ERC20 _token, uint256 _tokenBalance)
-        private view
+        private
+        view
         returns (uint256)
     {
         uint256 priceTokenNum;
@@ -217,18 +307,10 @@ contract Pool {
         );
     }
 
-    /// @dev Collects the funds to the Pool. Closes auction
-    function collectFunds() external atStage(Stages.Collect) {
-        stage = Stages.Claim;
-        uint256 auctionIndex = dx.getAuctionIndex(address(token1), address(token2));
-
-        // post buy order
-        token2.approve(address(dx), token2Balance);
-        dx.deposit(address(token2), token2Balance);
-        dx.postBuyOrder(address(token1), address(token2), auctionIndex, token2Balance);
-
+    function _collectFunds() private {
         // claim funds to pool
         dx.claimSellerFunds(address(token1), address(token2), address(this), 1);
+        dx.claimBuyerFunds(address(token1), address(token2), address(this), 1);
 
         newToken1Balance = dx.balances(address(token1),address(this));
         newToken2Balance = dx.balances(address(token2),address(this));
@@ -245,13 +327,6 @@ contract Pool {
     }
 
     function _addTokenPair() private {
-        stage = Stages.Collect;
-
-        if (isAuctionWithWeth) {
-            uint256 ethBalance = address(this).balance;
-            IEtherToken(address(token1)).deposit.value(ethBalance)();
-        }
-
         token1.approve(address(dx), token1Balance);
         dx.deposit(address(token1), token1Balance);
 
@@ -263,7 +338,17 @@ contract Pool {
             initialClosingPriceNum,
             initialClosingPriceDen
         );
-        emit TokenPair(address(token1), address(token2));
+        emit TokenPair(address(token1), address(token2), token1Balance);
+
+        stage = Stages.Collect;
+    }
+
+    function _buyTokens() private {
+        uint256 auctionIndex = dx.getAuctionIndex(address(token1), address(token2));
+
+        token2.approve(address(dx), token2Balance);
+        dx.deposit(address(token2), token2Balance);
+        dx.postBuyOrder(address(token1), address(token2), auctionIndex, token2Balance);
     }
 
     function _transferTokensToUser(
@@ -322,18 +407,19 @@ contract Pool {
     }
 
     event Contribute(
-         address sender,
-         address token,
-         uint256 amount
+        address sender,
+        address token,
+        uint256 amount
     );
 
     event TokenPair(
-         address token1,
-         address token2
+        address token1,
+        address token2,
+        uint256 token1Balance
     );
 
     event Claim(
-         address sender,
-         uint256 amount
+        address sender,
+        uint256 amount
     );
 }

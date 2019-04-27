@@ -21,7 +21,7 @@ contract Pool {
     uint256 public initialClosingPriceDen;
 
     DutchExchange public dx;
-    IEtherToken public token1;
+    ERC20 public token1;
     ERC20 public token2;
 
     uint256 public token1Balance;
@@ -186,7 +186,7 @@ contract Pool {
                 "No WETH in the pair and no WETH auction for token2!"
             );
         }
-        
+
         token1FundedValueUSD = isAuctionWithWeth
             ? token1Balance.mul(getEthInUsd())
             : _calculateUSDFundedValueForListedToken(token1, token1Balance);

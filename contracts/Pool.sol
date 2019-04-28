@@ -86,11 +86,8 @@ contract Pool {
         if (dx.ethToken() == _token2) {
             token1 = IEtherToken(_token2);
             token2 = ERC20(_token1);
-        } else if (isAuctionWithWeth) {
-            token1 = IEtherToken(_token1);
-            token2 = ERC20(_token2);
         } else {
-            token1 = ERC20(_token1);
+            token1 = IEtherToken(_token1);
             token2 = ERC20(_token2);
         }
 
@@ -192,8 +189,8 @@ contract Pool {
             : _calculateUSDFundedValueForListedToken(token1, token1Balance);
 
         uint256 token2FundedValueETH = token2Balance
-            .mul(initialClosingPriceNum)
-            .div(initialClosingPriceDen);
+            .mul(initialClosingPriceDen.mul(2))
+            .div(initialClosingPriceNum);
         token2FundedValueUSD = token2FundedValueETH.mul(getEthInUsd());
 
         if (!token1ThresholdReached && token1FundedValueUSD >= dx.thresholdNewTokenPair()) {
@@ -275,36 +272,6 @@ contract Pool {
         uint256 fundedValueETH = _tokenBalance.mul(priceTokenNum).div(priceTokenDen);
 
         return fundedValueETH.mul(getEthInUsd());
-    }
-
-    /// @dev Withdraw mechanism for the sell side. Must be in Contribute Stage
-    function withdraw() external atStage(Stages.Contribute) {
-        require(
-            contributorToken1Amount[msg.sender] > 0 || contributorToken2Amount[msg.sender] > 0,
-            "No funds for user to withdraw!"
-        );
-
-        uint256 contributedToken1 = contributorToken1Amount[msg.sender];
-        uint256 contributedToken2 = contributorToken2Amount[msg.sender];
-
-        contributorToken1Amount[msg.sender] = 0;
-        contributorToken2Amount[msg.sender] = 0;
-
-        if (isAuctionWithWeth) {
-            uint256 ethRefund = contributedToken1 > address(this).balance
-                ? address(this).balance : contributedToken1;
-            address(msg.sender).transfer(ethRefund);
-            contributedToken1 = contributedToken1.sub(ethRefund); // WETH refund
-        }
-
-        require(
-            token1.transfer(msg.sender, contributedToken1),
-            "Contract has not enough funds of token1 for withdrawal!"
-        );
-        require(
-            token2.transfer(msg.sender, contributedToken2),
-            "Contract has not enough funds of token2 for withdrawal!"
-        );
     }
 
     function _collectFunds() private {

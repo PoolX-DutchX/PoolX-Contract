@@ -173,6 +173,10 @@ contract Pool {
 
     function _thresholdIsReached() private returns (bool) {
         uint256 token1FundedValueUSD;
+        uint256 token2FundedValueUSD;
+        uint256 token2FundedValueInToken1 = token2Balance
+            .mul(initialClosingPriceDen)
+            .div(initialClosingPriceNum);
 
         // DutchX requires ethToken-Token auctions to exist
         if (!isAuctionWithWeth) {
@@ -184,14 +188,21 @@ contract Pool {
                 dx.getAuctionIndex(address(token2), dx.ethToken()) > 0,
                 "No WETH in the pair and no WETH auction for token2!"
             );
-            token1FundedValueUSD = _calculateUSDFundedValueForListedToken(token1, token1Balance);
+
+            (uint256 priceToken1Num, uint256 priceToken1Den) =
+                dx.getPriceOfTokenInLastAuction(address(token1));
+            uint256 token1FundedValueETH = token1Balance.mul(priceToken1Num).div(priceToken1Den);
+
+            token1FundedValueUSD = token1FundedValueETH.mul(getEthInUsd());
+
+            token2FundedValueUSD = token2FundedValueInToken1
+                .mul(getEthInUsd()
+                .mul(priceToken1Num)
+                .div(priceToken1Den));
         } else {
             token1FundedValueUSD = token1Balance.mul(getEthInUsd());
+            token2FundedValueUSD = token2FundedValueInToken1.mul(getEthInUsd());
         }
-
-        uint256 token2FundedValueInToken1 = token2Balance.mul(initialClosingPriceDen).div(initialClosingPriceNum);
-        (uint256 priceToken1Num, uint256 priceToken1Den) = dx.getPriceOfTokenInLastAuction(address(token1));
-        uint256 token2FundedValueUSD = token2FundedValueInToken1.mul(getEthInUsd().mul(priceToken1Num).div(priceToken1Den));
 
         if (!token1ThresholdReached && token1FundedValueUSD >= dx.thresholdNewTokenPair()) {
             token1ThresholdReached = true;
@@ -259,19 +270,6 @@ contract Pool {
         }
 
         return refundETH;
-    }
-
-    function _calculateUSDFundedValueForListedToken(ERC20 _token, uint256 _tokenBalance)
-        private
-        view
-        returns (uint256)
-    {
-        uint256 priceTokenNum;
-        uint256 priceTokenDen;
-        (priceTokenNum, priceTokenDen) = dx.getPriceOfTokenInLastAuction(address(_token));
-        uint256 fundedValueETH = _tokenBalance.mul(priceTokenNum).div(priceTokenDen);
-
-        return fundedValueETH.mul(getEthInUsd());
     }
 
     function _collectFunds() private {

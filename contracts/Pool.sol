@@ -173,7 +173,6 @@ contract Pool {
 
     function _thresholdIsReached() private returns (bool) {
         uint256 token1FundedValueUSD;
-        uint256 token2FundedValueUSD;
 
         // DutchX requires ethToken-Token auctions to exist
         if (!isAuctionWithWeth) {
@@ -186,12 +185,13 @@ contract Pool {
                 "No WETH in the pair and no WETH auction for token2!"
             );
             token1FundedValueUSD = _calculateUSDFundedValueForListedToken(token1, token1Balance);
-            token2FundedValueUSD = _calculateUSDFundedValueForListedToken(token2, token2Balance);
         } else {
             token1FundedValueUSD = token1Balance.mul(getEthInUsd());
-            uint256 fundedValueETH = token2Balance.mul(initialClosingPriceDen).div(initialClosingPriceNum);
-            token2FundedValueUSD = fundedValueETH.mul(getEthInUsd());
         }
+
+        uint256 token2FundedValueInToken1 = token2Balance.mul(initialClosingPriceDen).div(initialClosingPriceNum);
+        (uint256 priceToken1Num, uint256 priceToken1Den) = dx.getPriceOfTokenInLastAuction(address(token1));
+        uint256 token2FundedValueUSD = token2FundedValueInToken1.mul(getEthInUsd().mul(priceToken1Num).div(priceToken1Den));
 
         if (!token1ThresholdReached && token1FundedValueUSD >= dx.thresholdNewTokenPair()) {
             token1ThresholdReached = true;
@@ -272,36 +272,6 @@ contract Pool {
         uint256 fundedValueETH = _tokenBalance.mul(priceTokenNum).div(priceTokenDen);
 
         return fundedValueETH.mul(getEthInUsd());
-    }
-
-    /// @dev Withdraw mechanism for the sell side. Must be in Contribute Stage
-    function withdraw() external atStage(Stages.Contribute) {
-        require(
-            contributorToken1Amount[msg.sender] > 0 || contributorToken2Amount[msg.sender] > 0,
-            "No funds for user to withdraw!"
-        );
-
-        uint256 contributedToken1 = contributorToken1Amount[msg.sender];
-        uint256 contributedToken2 = contributorToken2Amount[msg.sender];
-
-        contributorToken1Amount[msg.sender] = 0;
-        contributorToken2Amount[msg.sender] = 0;
-
-        if (isAuctionWithWeth) {
-            uint256 ethRefund = contributedToken1 > address(this).balance
-                ? address(this).balance : contributedToken1;
-            address(msg.sender).transfer(ethRefund);
-            contributedToken1 = contributedToken1.sub(ethRefund); // WETH refund
-        }
-
-        require(
-            token1.transfer(msg.sender, contributedToken1),
-            "Contract has not enough funds of token1 for withdrawal!"
-        );
-        require(
-            token2.transfer(msg.sender, contributedToken2),
-            "Contract has not enough funds of token2 for withdrawal!"
-        );
     }
 
     function _collectFunds() private {

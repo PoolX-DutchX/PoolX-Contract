@@ -185,16 +185,13 @@ contract Pool {
                 dx.getAuctionIndex(address(token2), dx.ethToken()) > 0,
                 "No WETH in the pair and no WETH auction for token2!"
             );
+            token1FundedValueUSD = _calculateUSDFundedValueForListedToken(token1, token1Balance);
+            token2FundedValueUSD = _calculateUSDFundedValueForListedToken(token2, token2Balance);
+        } else {
+            token1FundedValueUSD = token1Balance.mul(getEthInUsd());
+            uint256 fundedValueETH = token2Balance.mul(initialClosingPriceDen).div(initialClosingPriceNum);
+            token2FundedValueUSD = fundedValueETH.mul(getEthInUsd());
         }
-
-        token1FundedValueUSD = isAuctionWithWeth
-            ? token1Balance.mul(getEthInUsd())
-            : _calculateUSDFundedValueForListedToken(token1, token1Balance);
-
-        uint256 token2FundedValueETH = token2Balance
-            .mul(initialClosingPriceNum)
-            .div(initialClosingPriceDen);
-        token2FundedValueUSD = token2FundedValueETH.mul(getEthInUsd());
 
         if (!token1ThresholdReached && token1FundedValueUSD >= dx.thresholdNewTokenPair()) {
             token1ThresholdReached = true;

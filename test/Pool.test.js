@@ -220,7 +220,7 @@ contract('Pool', ([owner, contributor]) => {
         token.address
       )).toNumber()
 
-      await time.increaseTo(auctionStart + duration.hours(30))
+      await time.increaseTo(auctionStart + duration.hours(10))
     })
 
     it('should not work when funds are NOT collected', async () => {

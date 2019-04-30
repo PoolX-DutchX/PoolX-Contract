@@ -15,19 +15,20 @@ contract('Pool', ([owner, contributor]) => {
   const initialClosingPriceNum = 2
   const initialClosingPriceDen = 1
   const oneEth = ether('1')
-  const oneHundredEth = ether('100')
-  const twoHundredEth = ether('200')
+  const twentyEth = ether('20')
+  const fortyTokens = ether('40')
+  const refundedTokens = new BN('1818181818181818180')
 
   async function listToken() {
     // weth sell side
-    await weth.deposit({ from: contributor, value: oneHundredEth })
-    await weth.approve(pool.address, oneHundredEth, { from: contributor })
+    await weth.deposit({ from: contributor, value: twentyEth })
+    await weth.approve(pool.address, twentyEth, { from: contributor })
 
     // token buy side
-    await token.transfer(contributor, twoHundredEth, { from: owner })
-    await token.approve(pool.address, twoHundredEth, { from: contributor })
+    await token.transfer(contributor, fortyTokens, { from: owner })
+    await token.approve(pool.address, fortyTokens, { from: contributor })
 
-    await pool.contribute(oneHundredEth, twoHundredEth, {
+    await pool.contribute(twentyEth, fortyTokens, {
       from: contributor,
     })
   }
@@ -39,24 +40,9 @@ contract('Pool', ([owner, contributor]) => {
     )
 
     const latestTime = await time.latest()
-
-    console.log({
-      latestTime: latestTime.toNumber(),
-      auctionStart: auctionStart.toNumber(),
-    })
-
     if (auctionStart.gt(latestTime)) await time.increaseTo(auctionStart)
 
-    const latestTime2 = await time.latest()
-
-    console.log({
-      latestTime2: latestTime2.toNumber(),
-      auctionStart: auctionStart.toNumber(),
-    })
-
-    console.log('AAAA')
     await pool.buyAndCollect()
-    console.log('BBBB')
   }
 
   beforeEach(async () => {
@@ -89,16 +75,6 @@ contract('Pool', ([owner, contributor]) => {
         token.address
       )
       expect(auctionIndex).to.be.bignumber.eq('0')
-    })
-
-    it('should update the pool funds in USD ', async () => {
-      await weth.deposit({ from: contributor, value: oneEth })
-      await weth.approve(pool.address, oneEth, { from: contributor })
-      await pool.contribute(0, 0, { from: contributor })
-
-      const poolBalanceInUsd = await pool.getEthInUsd()
-
-      expect(poolBalanceInUsd).to.be.bignumber.eq('1100')
     })
 
     it('should be able to list the token', async () => {
@@ -223,6 +199,17 @@ contract('Pool', ([owner, contributor]) => {
       await time.increaseTo(auctionStart + duration.hours(10))
     })
 
+    it('should claim funds', async () => {
+      await buyAndCollect()
+
+      let contributorBalance = await token.balanceOf(contributor)
+      expect(contributorBalance).to.be.bignumber.eq(refundedTokens)
+
+      await pool.claimFunds({ from: contributor })
+      contributorBalance = await token.balanceOf(contributor)
+      assert(contributorBalance.gt(refundedTokens))
+    })
+
     it('should not work when funds are NOT collected', async () => {
       try {
         await pool.claimFunds()
@@ -235,9 +222,6 @@ contract('Pool', ([owner, contributor]) => {
     it('should not be possible to claim second time', async () => {
       await buyAndCollect()
 
-      let contributorBalance = await token.balanceOf(contributor)
-      expect(contributorBalance).to.be.bignumber.eq('0')
-
       await pool.claimFunds({ from: contributor })
 
       try {
@@ -246,20 +230,6 @@ contract('Pool', ([owner, contributor]) => {
       } catch (e) {
         ensuresException(e)
       }
-
-      contributorBalance = await token.balanceOf(contributor)
-      assert(contributorBalance.gt(0))
-    })
-
-    it('should claim funds', async () => {
-      await buyAndCollect()
-
-      let contributorBalance = await token.balanceOf(contributor)
-      expect(contributorBalance).to.be.bignumber.eq('0')
-
-      await pool.claimFunds({ from: contributor })
-      contributorBalance = await token.balanceOf(contributor)
-      assert(contributorBalance.gt(0))
     })
   })
 })

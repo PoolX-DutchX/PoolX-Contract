@@ -10,10 +10,6 @@ import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 contract Pool {
     using SafeMath for uint256;
 
-    // TODO remove
-    uint256 public refundETHToken1;
-    uint256 public refundETHToken2;
-
     mapping (address => uint256) public contributorToken1Amount;
     mapping (address => uint256) public contributorToken2Amount;
 
@@ -209,20 +205,20 @@ contract Pool {
 
             uint256 refund = _refundTokenAboveThreshold(
                 token1,
-                token1FundedValueUSD,
-                false
+                token1FundedValueUSD
             );
 
             token1Balance = token1Balance.sub(refund);
             contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].sub(refund);
         }
 
-        if (!token2ThresholdReached && token2FundedValueUSD >= dx.thresholdNewTokenPair()) {
+        //Halving token2FundedValueUSD as the token1 initial price in an auction is doubled (at start time)
+        uint256 halvedToken2FundedValueUSD = token2FundedValueUSD.div(2);
+        if (!token2ThresholdReached && halvedToken2FundedValueUSD >= dx.thresholdNewTokenPair()) {
             token2ThresholdReached = true;
             uint256 refund = _refundTokenAboveThreshold(
                 token2,
-                token2FundedValueUSD,
-                true
+                halvedToken2FundedValueUSD
             );
 
             token2Balance = token2Balance.sub(refund);
@@ -234,42 +230,37 @@ contract Pool {
 
     function _refundTokenAboveThreshold(
         ERC20 _token,
-        uint256 fundedValueUSD,
-        bool isToken2
+        uint256 fundedValueUSD
     )
         private
         returns (uint256)
     {
         uint256 refundUSD = fundedValueUSD.sub(dx.thresholdNewTokenPair());
         uint256 refundETH = refundUSD.div(getEthInUsd());
+        uint256 refundToken;
 
-        if (!isAuctionWithWeth && !isToken2) {
-            uint256 priceTokenNum;
-            uint256 priceTokenDen;
-            (priceTokenNum, priceTokenDen) = dx.getPriceOfTokenInLastAuction(address(_token));
-            refundETH = refundETH.mul(priceTokenDen).div(priceTokenNum);
-        } else if (isToken2) {
-            refundETH = refundETH
-                .mul(initialClosingPriceDen)
-                .div(initialClosingPriceNum.mul(2));
-        }
-
-        if (isToken2) {
-            refundETHToken2 = refundETH;
+        if (isAuctionWithWeth) {
+            if (_token == token1) {
+                refundToken = refundETH;
+            } else {
+                refundToken = refundETH.mul(initialClosingPriceNum).div(initialClosingPriceDen);
+            }
         } else {
-            refundETHToken1 = refundETH;
+            (uint256 priceTokenNum, uint256 priceTokenDen) =
+                dx.getPriceOfTokenInLastAuction(address(_token));
+            refundToken = refundETH.mul(priceTokenDen).div(priceTokenNum);
         }
 
-        require(refundETH <= _token.balanceOf(address(this)), 'Pool cant refund!');
+        require(refundToken <= _token.balanceOf(address(this)), 'Pool can\'t refund!');
 
-        if (refundETH > 0) {
+        if (refundToken > 0) {
             require(
-                _token.transfer(msg.sender, refundETH),
+                _token.transfer(msg.sender, refundToken),
                 "Token refund failed!"
             );
         }
 
-        return refundETH;
+        return refundToken;
     }
 
     function _collectFunds() private {

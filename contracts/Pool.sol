@@ -6,7 +6,7 @@ import "../node_modules/@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInte
 import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
-/// @title Provides pooling for dutchX
+/// @title Pooling mechanism for DutchX
 contract Pool {
     using SafeMath for uint256;
 
@@ -17,15 +17,18 @@ contract Pool {
     uint256 public initialClosingPriceDen;
 
     DutchExchange public dx;
-    IEtherToken public token1;
+    ERC20 public token1;
     ERC20 public token2;
 
     uint256 public token1Balance;
     uint256 public token2Balance;
+
     uint256 public newToken1Balance;
     uint256 public newToken2Balance;
 
-    bool public isAuctionWithWeth = true;
+    bool public isAuctionWithWeth;
+    bool public token1ThresholdReached;
+    bool public token2ThresholdReached;
 
     Stages public stage = Stages.Initialize;
 
@@ -39,11 +42,17 @@ contract Pool {
     modifier atStage(Stages _stage) {
         require(
             stage == _stage,
-            "Function can't be called at this time."
+            "Wrong pooling stage. Action not allowed."
         );
         _;
     }
 
+    /// @dev initialization function for a pool. Must be called to start an auction
+    /// @param _dx is the address of the DutchX exchange
+    /// @param _token1 is the address of the first ERC20 token or Wrapped eth (weth) in the token pair to be listed
+    /// @param _token2 is the address of the second ERC20 token or Wrapped eth (weth) in the token pair to be listed
+    /// @param _initialClosingPriceNum initial price will be 2 * initialClosingPrice. This is its numerator
+    /// @param _initialClosingPriceDen initial price will be 2 * initialClosingPrice. This is its denominator
     function init(
         address _dx,
         address payable _token1,
@@ -73,8 +82,11 @@ contract Pool {
         if (dx.ethToken() == _token2) {
             token1 = IEtherToken(_token2);
             token2 = ERC20(_token1);
-        } else {
+        } else if (isAuctionWithWeth) {
             token1 = IEtherToken(_token1);
+            token2 = ERC20(_token2);
+        } else {
+            token1 = ERC20(_token1);
             token2 = ERC20(_token2);
         }
 
@@ -103,18 +115,27 @@ contract Pool {
         require(_token1 != _token2, "token1 and token2 must differ!");
     }
 
-    /**
-     * @dev Contribute to a Pool with ether. The stage is finished when ether worth 1000$
-     *      is collected and a dx token pair (token1/new token is created).
-     */
+    /// @dev Contribute to a Pool. The stage is finished when amount collected
+    ///  has a USD funded value higher than the DutchX tokenPair threshold.
+    ///  A dx token pair (token1/new token is created).
+    /// @param contributeToken1 is the amount of contribution with token1
+    /// @param contributeToken2 is the amount to contribute with token2
     function contribute(uint256 contributeToken1, uint256 contributeToken2) public payable atStage(Stages.Contribute)
     {
-        if (!isAuctionWithWeth){
-            require(
-                msg.value == 0,
-                "Don't send ether for token pairs without Weth!"
-            );
-        }
+        require(
+            msg.value == 0,
+            "Don't send ether, use WETH for auctions with ether!"
+        );
+
+        require(
+            contributeToken1 == 0 || !token1ThresholdReached,
+            "Don't send token1, threshold is reached!"
+        );
+
+        require(
+            contributeToken2 == 0 || !token2ThresholdReached,
+            "Don't send token2, threshold is reached!"
+        );
 
         require(
             token1.transferFrom(address(msg.sender), address(this), contributeToken1),
@@ -125,135 +146,128 @@ contract Pool {
             "Missing contributeToken2 funds for contract!"
         );
 
-        contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].add(contributeToken1).add(msg.value);
+        contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].add(contributeToken1);
         contributorToken2Amount[msg.sender] = contributorToken2Amount[msg.sender].add(contributeToken2);
 
         emit Contribute(msg.sender, address(token1), contributeToken1);
         emit Contribute(msg.sender, address(token2), contributeToken2);
 
-        token1Balance = token1Balance.add(contributeToken1).add(msg.value);
+        token1Balance = token1Balance.add(contributeToken1);
         token2Balance = token2Balance.add(contributeToken2);
 
-        uint256 fundedValueUSD = isAuctionWithWeth ?
-            token1Balance.mul(getEthInUsd())
-            : _calculateFundedValueTokenToken(
-                address(token1),
-                address(token2),
-                token1Balance,
-                token2Balance,
-                getEthInUsd()
-            );
-
-        if (fundedValueUSD >= dx.thresholdNewTokenPair()) {
+        if (_thresholdIsReached()) {
             _addTokenPair();
         }
     }
 
-    function _calculateFundedValueTokenToken(
-        address _token1,
-        address _token2,
-        uint token1Funding,
-        uint token2Funding,
-        uint ethUSDPrice
+    function buyAndCollect() public atStage(Stages.Collect) {
+        _buyTokens();
+        _collectFunds();
+
+        stage = Stages.Claim;
+    }
+
+    function _thresholdIsReached() private returns (bool) {
+        uint256 token1FundedValueUSD;
+        uint256 token2FundedValueUSD;
+        uint256 token2FundedValueInToken1 = token2Balance
+            .mul(initialClosingPriceDen)
+            .div(initialClosingPriceNum);
+
+        // DutchX requires ethToken-Token auctions to exist
+        if (!isAuctionWithWeth) {
+            require(
+                dx.getAuctionIndex(address(token1), dx.ethToken()) > 0,
+                "No WETH in the pair and no WETH auction for token1!"
+            );
+            require(
+                dx.getAuctionIndex(address(token2), dx.ethToken()) > 0,
+                "No WETH in the pair and no WETH auction for token2!"
+            );
+
+            (uint256 priceToken1Num, uint256 priceToken1Den) =
+                dx.getPriceOfTokenInLastAuction(address(token1));
+            uint256 token1FundedValueETH = token1Balance.mul(priceToken1Num).div(priceToken1Den);
+
+            token1FundedValueUSD = token1FundedValueETH.mul(getEthInUsd());
+
+            token2FundedValueUSD = token2FundedValueInToken1
+                .mul(getEthInUsd()
+                .mul(priceToken1Num)
+                .div(priceToken1Den));
+        } else {
+            token1FundedValueUSD = token1Balance.mul(getEthInUsd());
+            token2FundedValueUSD = token2FundedValueInToken1.mul(getEthInUsd());
+        }
+
+        if (!token1ThresholdReached && token1FundedValueUSD >= dx.thresholdNewTokenPair()) {
+            token1ThresholdReached = true;
+
+            uint256 refund = _refundTokenAboveThreshold(
+                token1,
+                token1FundedValueUSD
+            );
+
+            token1Balance = token1Balance.sub(refund);
+            contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].sub(refund);
+        }
+
+        //Halving token2FundedValueUSD as the token1 initial price in an auction is doubled (at start time)
+        uint256 halvedToken2FundedValueUSD = token2FundedValueUSD.div(2);
+        if (!token2ThresholdReached && halvedToken2FundedValueUSD >= dx.thresholdNewTokenPair()) {
+            token2ThresholdReached = true;
+            uint256 refund = _refundTokenAboveThreshold(
+                token2,
+                halvedToken2FundedValueUSD
+            );
+
+            token2Balance = token2Balance.sub(refund);
+            contributorToken2Amount[msg.sender] = contributorToken2Amount[msg.sender].sub(refund);
+        }
+
+        return token1ThresholdReached && token2ThresholdReached;
+    }
+
+    function _refundTokenAboveThreshold(
+        ERC20 _token,
+        uint256 fundedValueUSD
     )
         private
-        view
         returns (uint256)
     {
-        // We require ethToken-Token auctions to exist
-        // R3.1
-        require(
-            dx.getAuctionIndex(_token1, dx.ethToken()) > 0,
-            "No auction for token1 exists!"
-        );
-
-        // R3.2
-        require(
-            dx.getAuctionIndex(_token2, dx.ethToken()) > 0,
-            "No auction for token2 exists!"
-        );
-
-        // Price of Token 1
-        uint256 priceToken1Num;
-        uint256 priceToken1Den;
-        (priceToken1Num, priceToken1Den) = dx.getPriceOfTokenInLastAuction(_token1);
-
-        // Price of Token 2
-        uint256 priceToken2Num;
-        uint256 priceToken2Den;
-        (priceToken2Num, priceToken2Den) = dx.getPriceOfTokenInLastAuction(_token2);
-
-        // Compute funded value in ethToken and USD
-        // 10^30 * 10^30 = 10^60
-        uint256 fundedValueETH = (token1Funding.mul(priceToken1Num).div(priceToken1Den))
-            .add(token2Funding * priceToken2Num / priceToken2Den);
-
-        return fundedValueETH.mul(ethUSDPrice);
-    }
-
-    function withdraw() external atStage(Stages.Contribute) {
-        require(
-            contributorToken1Amount[msg.sender] > 0 || contributorToken2Amount[msg.sender] > 0,
-            "No funds for user to withdraw!"
-        );
-
-        uint256 contributedToken1 = contributorToken1Amount[msg.sender];
-        uint256 contributedToken2 = contributorToken2Amount[msg.sender];
-
-        contributorToken1Amount[msg.sender] = 0;
-        contributorToken2Amount[msg.sender] = 0;
+        uint256 refundUSD = fundedValueUSD.sub(dx.thresholdNewTokenPair());
+        uint256 refundETH = refundUSD.div(getEthInUsd());
+        uint256 refundToken;
 
         if (isAuctionWithWeth) {
-            uint256 ethRefund = contributedToken1 > address(this).balance
-                ? address(this).balance : contributedToken1;
-            address(msg.sender).transfer(ethRefund);
-            contributedToken1 = contributedToken1.sub(ethRefund); // WETH refund
+            if (_token == token1) {
+                refundToken = refundETH;
+            } else {
+                refundToken = refundETH.mul(initialClosingPriceNum).div(initialClosingPriceDen);
+            }
+        } else {
+            (uint256 priceTokenNum, uint256 priceTokenDen) =
+                dx.getPriceOfTokenInLastAuction(address(_token));
+            refundToken = refundETH.mul(priceTokenDen).div(priceTokenNum);
         }
 
-        require(
-            token1.transfer(msg.sender, contributedToken1),
-            "Contract has not enough funds of token1 for withdrawal!"
-        );
-        require(
-            token2.transfer(msg.sender, contributedToken2),
-            "Contract has not enough funds of token2 for withdrawal!"
-        );
-    }
+        require(refundToken <= _token.balanceOf(address(this)), 'Pool can\'t refund!');
 
-    function _addTokenPair() private {
-        stage = Stages.Collect;
-
-        if (isAuctionWithWeth) {
-            uint256 ethBalance = address(this).balance;
-            IEtherToken(address(token1)).deposit.value(ethBalance)();
+        if (refundToken > 0) {
+            require(
+                _token.transfer(msg.sender, refundToken),
+                "Token refund failed!"
+            );
         }
 
-        token1.approve(address(dx), token1Balance);
-        token2.approve(address(dx), token2Balance);
-
-        dx.deposit(address(token1), token1Balance);
-        dx.deposit(address(token2), token2Balance);
-
-        dx.addTokenPair(
-            address(token1),
-            address(token2),
-            token1Balance,
-            token2Balance,
-            initialClosingPriceNum,
-            initialClosingPriceDen
-        );
-        emit TokenPair(address(token1), address(token2));
+        return refundToken;
     }
 
-    /**
-     * @dev Collects the seller funds to the Pool. When successful, allows to collect share.
-     */
-    function collectFunds() external atStage(Stages.Collect) {
-        stage = Stages.Claim;
-        uint256 auctionIndex = dx.getAuctionIndex(address(token1), address(token2));
-        require(auctionIndex > 1, 'Auction is not yet finished!');
-
+    function _collectFunds() private {
+        // claim funds to pool
         dx.claimSellerFunds(address(token1), address(token2), address(this), 1);
+        dx.claimBuyerFunds(address(token1), address(token2), address(this), 1);
+
         newToken1Balance = dx.balances(address(token1),address(this));
         newToken2Balance = dx.balances(address(token2),address(this));
 
@@ -268,7 +282,32 @@ contract Pool {
         }
     }
 
-    function transferTokensToUser(
+    function _addTokenPair() private {
+        token1.approve(address(dx), token1Balance);
+        dx.deposit(address(token1), token1Balance);
+
+        dx.addTokenPair(
+            address(token1),
+            address(token2),
+            token1Balance,
+            0, // token2Balance is used for buy side
+            initialClosingPriceNum,
+            initialClosingPriceDen
+        );
+        emit TokenPair(address(token1), address(token2), token1Balance);
+
+        stage = Stages.Collect;
+    }
+
+    function _buyTokens() private {
+        uint256 auctionIndex = dx.getAuctionIndex(address(token1), address(token2));
+
+        token2.approve(address(dx), token2Balance);
+        dx.deposit(address(token2), token2Balance);
+        dx.postBuyOrder(address(token1), address(token2), auctionIndex, token2Balance);
+    }
+
+    function _transferTokensToUser(
         ERC20 token,
         uint256 contributorTokenAmount,
         uint256 newTokenBalance,
@@ -287,9 +326,7 @@ contract Pool {
         emit Claim(msg.sender, tokenShare);
     }
 
-    /**
-     * @dev contributors can claim their token share.
-     */
+    /// @dev contributors can claim their token share.
     function claimFunds() external atStage(Stages.Claim){
         require(
             contributorToken1Amount[msg.sender] > 0 ||
@@ -298,17 +335,17 @@ contract Pool {
         );
 
         if (token1Balance > 0) {
-            transferTokensToUser(
+            _transferTokensToUser(
                 token2,
                 contributorToken1Amount[msg.sender],
                 newToken2Balance,
                 token1Balance
             );
-            contributorToken1Amount[msg.sender] = 0;            
+            contributorToken1Amount[msg.sender] = 0;
         }
 
         if (token2Balance > 0) {
-            transferTokensToUser(
+            _transferTokensToUser(
                 token1,
                 contributorToken2Amount[msg.sender],
                 newToken1Balance,
@@ -318,35 +355,27 @@ contract Pool {
         }
     }
 
-    /**
-     * @dev Get value of one ether in USD.
-     */
+    /// @dev Get value of one ether in USD.
     function getEthInUsd() public view returns (uint256) {
         PriceOracleInterface priceOracle = PriceOracleInterface(dx.ethUSDOracle());
         uint256 etherUsdPrice = priceOracle.getUSDETHPrice();
         return etherUsdPrice;
     }
 
-    // Commented because of errors in PoolCloneFactory - might relate to
-    // https://github.com/trufflesuite/truffle/issues/1640
-    // function() external payable {
-    //     require(msg.value > 0, "Please send ether to contribute!");
-    //     contribute(0, 0);
-    // }
-
     event Contribute(
-         address sender,
-         address token,
-         uint256 amount
+        address sender,
+        address token,
+        uint256 amount
     );
 
     event TokenPair(
-         address token1,
-         address token2
+        address token1,
+        address token2,
+        uint256 token1Balance
     );
 
     event Claim(
-         address sender,
-         uint256 amount
+        address sender,
+        uint256 amount
     );
 }

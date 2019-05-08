@@ -170,7 +170,7 @@ contract Pool {
     function _thresholdIsReached() private returns (bool) {
         uint256 token1FundedValueUSD;
         uint256 token2FundedValueUSD;
-        uint256 token2FundedValueInToken1 = token2Balance
+        uint256 token2FundedValueAsToken1 = token2Balance
             .mul(initialClosingPriceDen)
             .div(initialClosingPriceNum);
 
@@ -191,13 +191,13 @@ contract Pool {
 
             token1FundedValueUSD = token1FundedValueETH.mul(getEthInUsd());
 
-            token2FundedValueUSD = token2FundedValueInToken1
+            token2FundedValueUSD = token2FundedValueAsToken1
                 .mul(getEthInUsd()
                 .mul(priceToken1Num)
                 .div(priceToken1Den));
         } else {
             token1FundedValueUSD = token1Balance.mul(getEthInUsd());
-            token2FundedValueUSD = token2FundedValueInToken1.mul(getEthInUsd());
+            token2FundedValueUSD = token2FundedValueAsToken1.mul(getEthInUsd());
         }
 
         if (!token1ThresholdReached && token1FundedValueUSD >= dx.thresholdNewTokenPair()) {
@@ -246,9 +246,16 @@ contract Pool {
                 refundToken = refundETH.mul(initialClosingPriceNum).div(initialClosingPriceDen);
             }
         } else {
-            (uint256 priceTokenNum, uint256 priceTokenDen) =
-                dx.getPriceOfTokenInLastAuction(address(_token));
-            refundToken = refundETH.mul(priceTokenDen).div(priceTokenNum);
+            (uint256 priceToken1Num, uint256 priceToken1Den) =
+            dx.getPriceOfTokenInLastAuction(address(token1));
+            uint256 refundEthAsToken1 = refundETH.mul(priceToken1Den).div(priceToken1Num);
+            if (_token == token1) {
+                refundToken = refundEthAsToken1;
+            } else {
+                //token1 -> token2
+                refundToken = refundEthAsToken1
+                .mul(initialClosingPriceNum).div(initialClosingPriceDen);
+            }
         }
 
         require(refundToken <= _token.balanceOf(address(this)), 'Pool can\'t refund!');

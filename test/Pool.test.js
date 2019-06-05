@@ -57,7 +57,9 @@ contract('Pool', ([owner, contributor]) => {
       weth.address,
       token.address,
       initialClosingPriceNum,
-      initialClosingPriceDen
+      initialClosingPriceDen,
+      'Pool name',
+      'Pool description'
     )
   })
 

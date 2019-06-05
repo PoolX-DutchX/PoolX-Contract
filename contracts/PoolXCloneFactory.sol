@@ -20,18 +20,23 @@ contract PoolXCloneFactory is Ownable, CloneFactory {
 
     function createPool(
         address _dx,
-        address payable _weth,
-        address payable _token,
-        uint _initialClosingPriceNum,
-        uint _initialClosingPriceDen
+        address payable _token1,
+        address payable _token2,
+        uint256 _initialClosingPriceNum,
+        uint256 _initialClosingPriceDen,
+        string memory _name,
+        string memory _description
+
     ) public onlyOwner {
         address clone = createClone(libraryAddress);
         Pool(clone).init(
             _dx,
-            _weth,
-            _token,
+            _token1,
+            _token2,
             _initialClosingPriceNum,
-            _initialClosingPriceDen
+            _initialClosingPriceDen,
+            _name,
+            _description
         );
         emit PoolCreated(address(clone));
     }

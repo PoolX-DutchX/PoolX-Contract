@@ -15,6 +15,8 @@ contract Pool {
 
     uint256 public initialClosingPriceNum;
     uint256 public initialClosingPriceDen;
+    string public name;
+    string public description;
 
     DutchExchange public dx;
     ERC20 public token1;
@@ -58,7 +60,9 @@ contract Pool {
         address payable _token1,
         address payable _token2,
         uint _initialClosingPriceNum,
-        uint _initialClosingPriceDen
+        uint _initialClosingPriceDen,
+        string calldata _name,
+        string calldata _description
     )
         external
         atStage(Stages.Initialize)
@@ -92,6 +96,8 @@ contract Pool {
 
         initialClosingPriceNum = _initialClosingPriceNum;
         initialClosingPriceDen = _initialClosingPriceDen;
+        name = _name;
+        description = _description;
         stage = Stages.Contribute;
     }
 
@@ -167,13 +173,16 @@ contract Pool {
         stage = Stages.Claim;
     }
 
-    function _thresholdIsReached() private returns (bool) {
+    function currentDxThreshold() public view returns(uint256) {
+        return dx.thresholdNewTokenPair();
+    }
+
+    function getFundedValueInUsd() public view returns (uint256, uint256) {
         uint256 token1FundedValueUSD;
         uint256 token2FundedValueUSD;
         uint256 token2FundedValueAsToken1 = token2Balance
             .mul(initialClosingPriceDen)
             .div(initialClosingPriceNum);
-
         // DutchX requires ethToken-Token auctions to exist
         if (!isAuctionWithWeth) {
             require(
@@ -199,6 +208,12 @@ contract Pool {
             token1FundedValueUSD = token1Balance.mul(getEthInUsd());
             token2FundedValueUSD = token2FundedValueAsToken1.mul(getEthInUsd());
         }
+
+        return (token1FundedValueUSD, token2FundedValueUSD);
+    }
+
+    function _thresholdIsReached() private returns (bool) {
+        (uint256 token1FundedValueUSD, uint256 token2FundedValueUSD) = getFundedValueInUsd();
 
         if (!token1ThresholdReached && token1FundedValueUSD >= dx.thresholdNewTokenPair()) {
             token1ThresholdReached = true;

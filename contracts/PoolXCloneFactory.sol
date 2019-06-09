@@ -9,6 +9,7 @@ contract PoolXCloneFactory is Ownable, CloneFactory {
     address public libraryAddress;
 
     event PoolCreated(address newPoolAddress);
+    address[] public pools;
 
     constructor(address _libraryAddress) public {
         libraryAddress = _libraryAddress;
@@ -27,7 +28,7 @@ contract PoolXCloneFactory is Ownable, CloneFactory {
         string memory _name,
         string memory _description
 
-    ) public onlyOwner {
+    ) public {
         address clone = createClone(libraryAddress);
         Pool(clone).init(
             _dx,
@@ -38,6 +39,7 @@ contract PoolXCloneFactory is Ownable, CloneFactory {
             _name,
             _description
         );
+        pools.push(address(clone));
         emit PoolCreated(address(clone));
     }
 

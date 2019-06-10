@@ -126,13 +126,8 @@ contract Pool {
     ///  A dx token pair (token1/new token is created).
     /// @param contributeToken1 is the amount of contribution with token1
     /// @param contributeToken2 is the amount to contribute with token2
-    function contribute(uint256 contributeToken1, uint256 contributeToken2) public payable atStage(Stages.Contribute)
+    function contribute(uint256 contributeToken1, uint256 contributeToken2) public atStage(Stages.Contribute)
     {
-        require(
-            msg.value == 0,
-            "Don't send ether, use WETH for auctions with ether!"
-        );
-
         require(
             contributeToken1 == 0 || !token1ThresholdReached,
             "Don't send token1, threshold is reached!"

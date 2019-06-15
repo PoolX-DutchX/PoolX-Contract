@@ -28,6 +28,8 @@ contract Pool {
     uint256 public newToken1Balance;
     uint256 public newToken2Balance;
 
+    uint256 public leftOverBuyTokens;
+
     bool public isAuctionWithWeth;
     bool public token1ThresholdReached;
     bool public token2ThresholdReached;
@@ -181,6 +183,9 @@ contract Pool {
 
     function buyAndCollect() public atStage(Stages.Collect) {
         _buyTokens();
+
+        leftOverBuyTokens = token2.balanceOf(address(this));
+
         _collectFunds();
 
         stage = Stages.Claim;
@@ -378,7 +383,7 @@ contract Pool {
     }
 
     /// @dev contributors can withdraw their contribution
-    function withdrawContribution() external atState(Stages.Contribute) {
+    function withdrawContribution() external atStage(Stages.Contribute) {
         uint256 token1Amount = contributorToken1Amount[msg.sender];
         uint256 token2Amount = contributorToken2Amount[msg.sender];
 
@@ -409,29 +414,39 @@ contract Pool {
 
     /// @dev contributors can claim their token share.
     function claimFunds() external atStage(Stages.Claim){
-        require(
-            contributorToken1Amount[msg.sender] > 0 ||
-            contributorToken2Amount[msg.sender] > 0,
-            "User has no funds to claim!"
-        );
+        uint256 token1Amount = contributorToken1Amount[msg.sender];
+        uint256 token2Amount = contributorToken2Amount[msg.sender];
 
-        if (token1Balance > 0) {
+        require(token1Amount > 0 || token2Amount > 0, 'No tokens contributed!');
+
+
+        if (token1Amount > 0) {
             _transferTokensToUser(
                 token2,
-                contributorToken1Amount[msg.sender],
+                token1Amount,
                 newToken2Balance,
                 token1Balance
             );
             contributorToken1Amount[msg.sender] = 0;
         }
 
-        if (token2Balance > 0) {
+        if (token2Amount > 0) {
             _transferTokensToUser(
                 token1,
-                contributorToken2Amount[msg.sender],
+                token2Amount,
                 newToken1Balance,
                 token2Balance
             );
+
+            if (leftOverBuyTokens > 0) {
+                _transferTokensToUser(
+                    token2,
+                    token2Amount,
+                    leftOverBuyTokens,
+                    token2Balance
+                );
+            }
+
             contributorToken2Amount[msg.sender] = 0;
         }
     }

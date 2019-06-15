@@ -33,6 +33,7 @@ contract Pool {
     bool public isAuctionWithWeth;
     bool public token1ThresholdReached;
     bool public token2ThresholdReached;
+    bool public hasPostedBuyOrder;
 
     Stages public stage = Stages.Initialize;
 
@@ -182,7 +183,9 @@ contract Pool {
     }
 
     function buyAndCollect() public atStage(Stages.Collect) {
-        _buyTokens();
+        if (dx.getAuctionIndex(address(token1), address(token2)) == 1) {
+            _buyTokens();
+        }
 
         leftOverBuyTokens = token2.balanceOf(address(this));
 
@@ -313,10 +316,12 @@ contract Pool {
     function _collectFunds() private {
         // claim funds to pool
         dx.claimSellerFunds(address(token1), address(token2), address(this), 1);
-        dx.claimBuyerFunds(address(token1), address(token2), address(this), 1);
-
         newToken1Balance = dx.balances(address(token1),address(this));
-        newToken2Balance = dx.balances(address(token2),address(this));
+
+        if (hasPostedBuyOrder) {
+            dx.claimBuyerFunds(address(token1), address(token2), address(this), 1);
+            newToken2Balance = dx.balances(address(token2),address(this));
+        }
 
         require(
             newToken1Balance > 0 || newToken2Balance > 0,
@@ -361,6 +366,7 @@ contract Pool {
             auctionIndex,
             token2Balance
         );
+        hasPostedBuyOrder = true;
     }
 
     function _transferTokensToUser(
@@ -413,12 +419,11 @@ contract Pool {
     }
 
     /// @dev contributors can claim their token share.
-    function claimFunds() external atStage(Stages.Claim){
+    function claimFunds() external atStage(Stages.Claim) {
         uint256 token1Amount = contributorToken1Amount[msg.sender];
         uint256 token2Amount = contributorToken2Amount[msg.sender];
 
         require(token1Amount > 0 || token2Amount > 0, 'No tokens contributed!');
-
 
         if (token1Amount > 0) {
             _transferTokensToUser(

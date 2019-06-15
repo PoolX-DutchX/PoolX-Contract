@@ -242,7 +242,8 @@ contract Pool {
             contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].sub(refund);
         }
 
-        //Halving token2FundedValueUSD as the token1 initial price in an auction is doubled (at start time)
+        // Halving token2FundedValueUSD as the token1 initial price
+        // in an auction is doubled (at start time)
         uint256 halvedToken2FundedValueUSD = token2FundedValueUSD.div(2);
         if (!token2ThresholdReached
             && halvedToken2FundedValueUSD >= dx.thresholdNewTokenPair()) {
@@ -374,6 +375,36 @@ contract Pool {
             );
         }
         emit Claim(msg.sender, tokenShare);
+    }
+
+    /// @dev contributors can withdraw their contribution
+    function withdrawContribution() external atState(Stages.Contribute) {
+        uint256 token1Amount = contributorToken1Amount[msg.sender];
+        uint256 token2Amount = contributorToken2Amount[msg.sender];
+
+        require(token1Amount > 0 || token2Amount > 0, 'No tokens contributed!');
+
+        if (token1Amount > 0) {
+            token1Balance = token1Balance.sub(token1Amount);
+            token1.transfer(msg.sender, token1Amount);
+        }
+
+        if (token2Amount > 0) {
+            token2Balance = token2Balance.sub(token2Amount);
+            token2.transfer(msg.sender, token2Amount);
+        }
+
+        (uint256 token1FundedValueUSD, uint256 token2FundedValueUSD)
+            = getFundedValueInUsd();
+
+        // Halving token2FundedValueUSD as the token1 initial price
+        // in an auction is doubled (at start time)
+        uint256 halvedToken2FundedValueUSD = token2FundedValueUSD.div(2);
+
+        token1ThresholdReached
+            = token1FundedValueUSD >= dx.thresholdNewTokenPair();
+        token2ThresholdReached
+            = halvedToken2FundedValueUSD >= dx.thresholdNewTokenPair();
     }
 
     /// @dev contributors can claim their token share.

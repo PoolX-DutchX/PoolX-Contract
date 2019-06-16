@@ -43,4 +43,7 @@ contract PoolXCloneFactory is Ownable, CloneFactory {
         emit PoolCreated(address(clone));
     }
 
+    function getPools() public view returns(address[] memory){
+        return pools;
+    }
 }

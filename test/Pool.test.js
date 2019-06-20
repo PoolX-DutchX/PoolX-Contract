@@ -33,6 +33,12 @@ contract('Pool', ([owner, contributor]) => {
     })
   }
 
+  async function contributeEth() {
+    await weth.deposit({ from: contributor, value: oneEth })
+    await weth.approve(pool.address, oneEth, { from: contributor })
+    await pool.contribute(oneEth, 0, { from: contributor })
+  }
+
   async function buyAndCollect() {
     const auctionStart = await dutchX.getAuctionStart.call(
       weth.address,
@@ -65,9 +71,7 @@ contract('Pool', ([owner, contributor]) => {
 
   describe('#contribute', () => {
     it('should deposit weth token in the contract', async () => {
-      await weth.deposit({ from: contributor, value: oneEth })
-      await weth.approve(pool.address, oneEth, { from: contributor })
-      await pool.contribute(oneEth, 0, { from: contributor })
+      await contributeEth()
       const contributedToken1Amount = await pool.contributorToken1Amount(
         contributor
       )
@@ -124,6 +128,15 @@ contract('Pool', ([owner, contributor]) => {
       } catch (e) {
         ensuresException(e)
       }
+    })
+
+    it('should be possible to withdraw the contribution', async () => {
+      await contributeEth()
+      const contributedAmount = await pool.contributorToken1Amount(contributor)
+      await pool.withdrawContribution({ from: contributor })
+      const withdrawnAmount = await weth.balanceOf(contributor)
+
+      expect(withdrawnAmount).to.be.bignumber.eq(contributedAmount)
     })
   })
 

@@ -398,11 +398,13 @@ contract Pool {
         if (token1Amount > 0) {
             token1Balance = token1Balance.sub(token1Amount);
             token1.transfer(msg.sender, token1Amount);
+            contributorToken1Amount[msg.sender] = 0;
         }
 
         if (token2Amount > 0) {
             token2Balance = token2Balance.sub(token2Amount);
             token2.transfer(msg.sender, token2Amount);
+            contributorToken2Amount[msg.sender] = 0;
         }
 
         (uint256 token1FundedValueUSD, uint256 token2FundedValueUSD)

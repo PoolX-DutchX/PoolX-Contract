@@ -39,6 +39,18 @@ contract('Pool', ([owner, contributor]) => {
     await pool.contribute(oneEth, 0, { from: contributor })
   }
 
+  async function getAuctionStart() {
+    const auctionStart = await dutchX.getAuctionStart.call(
+      weth.address,
+      token.address
+    )
+    return auctionStart.toNumber()
+  }
+
+  async function getAuctionIndex() {
+    return await dutchX.getAuctionIndex.call(weth.address, token.address)
+  }
+
   async function buyAndCollect() {
     const auctionStart = await dutchX.getAuctionStart.call(
       weth.address,
@@ -76,10 +88,7 @@ contract('Pool', ([owner, contributor]) => {
         contributor
       )
       expect(contributedToken1Amount).to.be.bignumber.eq(oneEth)
-      const auctionIndex = await dutchX.getAuctionIndex.call(
-        weth.address,
-        token.address
-      )
+      const auctionIndex = await getAuctionIndex()
       expect(auctionIndex).to.be.bignumber.eq('0')
     })
 
@@ -90,10 +99,7 @@ contract('Pool', ([owner, contributor]) => {
       const poolBalance = await web3.eth.getBalance(pool.address)
       expect(poolBalance).to.be.eq('0')
 
-      const auctionListedIndex = await dutchX.getAuctionIndex(
-        weth.address,
-        token.address
-      )
+      const auctionListedIndex = await getAuctionIndex()
       // proves that token was listed. Shows that in the dutchX exchange the first auction for the token pair exists
       expect(auctionListedIndex).to.be.bignumber.eq('1')
     })
@@ -108,10 +114,7 @@ contract('Pool', ([owner, contributor]) => {
 
       expect(contributedToken2Amount).to.be.bignumber.eq(oneEth)
 
-      const auctionIndex = await dutchX.getAuctionIndex.call(
-        weth.address,
-        token.address
-      )
+      const auctionIndex = await getAuctionIndex()
 
       expect(auctionIndex).to.be.bignumber.eq('0')
     })
@@ -157,10 +160,7 @@ contract('Pool', ([owner, contributor]) => {
     it('should not work when funds are already collected', async () => {
       await listToken()
 
-      const auctionStart = (await dutchX.getAuctionStart.call(
-        weth.address,
-        token.address
-      )).toNumber()
+      const auctionStart = await getAuctionStart()
 
       await time.increaseTo(auctionStart + duration.hours(1))
 
@@ -176,26 +176,17 @@ contract('Pool', ([owner, contributor]) => {
 
     it('should work immediately at auction start', async () => {
       await listToken()
-      const auctionStart = (await dutchX.getAuctionStart.call(
-        weth.address,
-        token.address
-      )).toNumber()
+      const auctionStart = await getAuctionStart()
 
       await time.increaseTo(auctionStart)
 
-      let auctionIndex = await dutchX.getAuctionIndex.call(
-        weth.address,
-        token.address
-      )
+      let auctionIndex = await getAuctionIndex()
       expect(auctionIndex).to.be.bignumber.eq('1') // still in first auction
 
       const poolBalanceBefore = await token.balanceOf(pool.address)
       await pool.buyAndCollect()
 
-      auctionIndex = await dutchX.getAuctionIndex.call(
-        weth.address,
-        token.address
-      )
+      auctionIndex = await getAuctionIndex()
       expect(auctionIndex).to.be.bignumber.eq('2') // first auction is finished. Index incremented.
 
       const poolBalanceAfter = await token.balanceOf(pool.address)
@@ -205,27 +196,18 @@ contract('Pool', ([owner, contributor]) => {
     it('should be possible to collect funds', async () => {
       await listToken()
 
-      const auctionStart = (await dutchX.getAuctionStart.call(
-        weth.address,
-        token.address
-      )).toNumber()
+      const auctionStart = await getAuctionStart()
 
       await time.increaseTo(auctionStart + duration.hours(1))
 
-      let auctionIndex = await dutchX.getAuctionIndex.call(
-        weth.address,
-        token.address
-      )
+      let auctionIndex = await getAuctionIndex()
       expect(auctionIndex).to.be.bignumber.eq('1') // still in first auction
 
       const poolBalanceBefore = await token.balanceOf(pool.address)
 
       await pool.buyAndCollect()
 
-      auctionIndex = await dutchX.getAuctionIndex.call(
-        weth.address,
-        token.address
-      )
+      auctionIndex = await getAuctionIndex()
       expect(auctionIndex).to.be.bignumber.eq('2') // first auction is finished. Index incremented.
 
       const poolBalanceAfter = await token.balanceOf(pool.address)
@@ -237,10 +219,7 @@ contract('Pool', ([owner, contributor]) => {
     beforeEach(async () => {
       await listToken()
 
-      const auctionStart = (await dutchX.getAuctionStart.call(
-        weth.address,
-        token.address
-      )).toNumber()
+      const auctionStart = await getAuctionStart()
 
       await time.increaseTo(auctionStart + duration.hours(10))
     })

@@ -59,7 +59,6 @@ contract('Pool', ([owner, contributor]) => {
 
     const latestTime = await time.latest()
     if (auctionStart.gt(latestTime)) await time.increaseTo(auctionStart)
-
     await pool.buyAndCollect()
   }
 
@@ -68,7 +67,6 @@ contract('Pool', ([owner, contributor]) => {
     weth = await EtherToken.deployed()
     dx = await DutchExchangeProxy.deployed()
     dutchX = await DutchExchange.at(dx.address)
-
     pool = await Pool.new()
     await pool.init(
       dx.address,
@@ -88,13 +86,13 @@ contract('Pool', ([owner, contributor]) => {
         contributor
       )
       expect(contributedToken1Amount).to.be.bignumber.eq(oneEth)
+
       const auctionIndex = await getAuctionIndex()
       expect(auctionIndex).to.be.bignumber.eq('0')
     })
 
     it('should be able to list the token', async () => {
       await listToken()
-
       // no more ether in pool contract
       const poolBalance = await web3.eth.getBalance(pool.address)
       expect(poolBalance).to.be.eq('0')
@@ -111,17 +109,14 @@ contract('Pool', ([owner, contributor]) => {
       const contributedToken2Amount = await pool.contributorToken2Amount(
         contributor
       )
-
       expect(contributedToken2Amount).to.be.bignumber.eq(oneEth)
 
       const auctionIndex = await getAuctionIndex()
-
       expect(auctionIndex).to.be.bignumber.eq('0')
     })
 
     it('should not be able to contribute after start', async () => {
       await listToken()
-
       await weth.deposit({ from: contributor, value: oneEth })
       await weth.approve(pool.address, oneEth, { from: contributor })
 
@@ -139,7 +134,6 @@ contract('Pool', ([owner, contributor]) => {
       const contributedAmount = await pool.contributorToken1Amount(contributor)
       await pool.withdrawContribution({ from: contributor })
       const wethBalanceAfterWithdraw = await weth.balanceOf(contributor)
-
       expect(
         wethBalanceAfterWithdraw.sub(wethBalanceInitial)
       ).to.be.bignumber.eq(contributedAmount)
@@ -159,11 +153,8 @@ contract('Pool', ([owner, contributor]) => {
 
     it('should not work when funds are already collected', async () => {
       await listToken()
-
       const auctionStart = await getAuctionStart()
-
       await time.increaseTo(auctionStart + duration.hours(1))
-
       await pool.buyAndCollect()
 
       try {
@@ -177,15 +168,12 @@ contract('Pool', ([owner, contributor]) => {
     it('should work immediately at auction start', async () => {
       await listToken()
       const auctionStart = await getAuctionStart()
-
       await time.increaseTo(auctionStart)
-
       let auctionIndex = await getAuctionIndex()
       expect(auctionIndex).to.be.bignumber.eq('1') // still in first auction
 
       const poolBalanceBefore = await token.balanceOf(pool.address)
       await pool.buyAndCollect()
-
       auctionIndex = await getAuctionIndex()
       expect(auctionIndex).to.be.bignumber.eq('2') // first auction is finished. Index incremented.
 
@@ -195,18 +183,13 @@ contract('Pool', ([owner, contributor]) => {
 
     it('should be possible to collect funds', async () => {
       await listToken()
-
       const auctionStart = await getAuctionStart()
-
       await time.increaseTo(auctionStart + duration.hours(1))
-
       let auctionIndex = await getAuctionIndex()
       expect(auctionIndex).to.be.bignumber.eq('1') // still in first auction
 
       const poolBalanceBefore = await token.balanceOf(pool.address)
-
       await pool.buyAndCollect()
-
       auctionIndex = await getAuctionIndex()
       expect(auctionIndex).to.be.bignumber.eq('2') // first auction is finished. Index incremented.
 
@@ -218,15 +201,12 @@ contract('Pool', ([owner, contributor]) => {
   describe('#claimFunds', () => {
     beforeEach(async () => {
       await listToken()
-
       const auctionStart = await getAuctionStart()
-
       await time.increaseTo(auctionStart + duration.hours(10))
     })
 
     it('should claim funds', async () => {
       await buyAndCollect()
-
       let contributorBalance = await token.balanceOf(contributor)
       expect(contributorBalance).to.be.bignumber.eq(refundedTokens)
 
@@ -246,7 +226,6 @@ contract('Pool', ([owner, contributor]) => {
 
     it('should not be possible to claim second time', async () => {
       await buyAndCollect()
-
       await pool.claimFunds({ from: contributor })
 
       try {

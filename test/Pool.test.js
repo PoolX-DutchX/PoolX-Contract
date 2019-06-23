@@ -131,17 +131,20 @@ contract('Pool', ([owner, contributor]) => {
     })
 
     it('should be possible to withdraw the contribution', async () => {
+      const wethBalanceInitial = await weth.balanceOf(contributor)
       await contributeEth()
       const contributedAmount = await pool.contributorToken1Amount(contributor)
       await pool.withdrawContribution({ from: contributor })
-      const withdrawnAmount = await weth.balanceOf(contributor)
+      const wethBalanceAfterWithdraw = await weth.balanceOf(contributor)
 
-      expect(withdrawnAmount).to.be.bignumber.eq(contributedAmount)
+      expect(
+        wethBalanceAfterWithdraw.sub(wethBalanceInitial)
+      ).to.be.bignumber.eq(contributedAmount)
     })
   })
 
   describe('#buyAndCollect', () => {
-    it('should not work before Auction starts', async () => {
+    it('should not work before auction starts', async () => {
       try {
         await listToken()
         await pool.buyAndCollect()
@@ -171,7 +174,35 @@ contract('Pool', ([owner, contributor]) => {
       }
     })
 
-    it('should be able to collect funds', async () => {
+    it('should work immediately at auction start', async () => {
+      await listToken()
+      const auctionStart = (await dutchX.getAuctionStart.call(
+        weth.address,
+        token.address
+      )).toNumber()
+
+      await time.increaseTo(auctionStart)
+
+      let auctionIndex = await dutchX.getAuctionIndex.call(
+        weth.address,
+        token.address
+      )
+      expect(auctionIndex).to.be.bignumber.eq('1') // still in first auction
+
+      const poolBalanceBefore = await token.balanceOf(pool.address)
+      await pool.buyAndCollect()
+
+      auctionIndex = await dutchX.getAuctionIndex.call(
+        weth.address,
+        token.address
+      )
+      expect(auctionIndex).to.be.bignumber.eq('2') // first auction is finished. Index incremented.
+
+      const poolBalanceAfter = await token.balanceOf(pool.address)
+      expect(poolBalanceAfter).to.be.bignumber.eq(poolBalanceBefore) // token2Balance or buyside funds are back in the pool
+    })
+
+    it('should be possible to collect funds', async () => {
       await listToken()
 
       const auctionStart = (await dutchX.getAuctionStart.call(

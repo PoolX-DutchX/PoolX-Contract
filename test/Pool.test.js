@@ -15,6 +15,7 @@ contract('Pool', ([owner, contributor]) => {
   const initialClosingPriceNum = 2
   const initialClosingPriceDen = 1
   const oneEth = ether('1')
+  const twoTokens = ether('2')
   const twentyEth = ether('20')
   const fortyTokens = ether('40')
   const refundedTokens = new BN('1818181818181818180')
@@ -37,6 +38,14 @@ contract('Pool', ([owner, contributor]) => {
     await weth.deposit({ from: contributor, value: oneEth })
     await weth.approve(pool.address, oneEth, { from: contributor })
     await pool.contribute(oneEth, 0, { from: contributor })
+  }
+
+  async function contributeWethAndToken() {
+    await weth.deposit({ from: contributor, value: oneEth })
+    await weth.approve(pool.address, oneEth, { from: contributor })
+    await token.transfer(contributor, twoTokens, { from: owner })
+    await token.approve(pool.address, twoTokens, { from: contributor })
+    await pool.contribute(oneEth, twoTokens, { from: contributor })
   }
 
   async function getAuctionStart() {
@@ -130,13 +139,23 @@ contract('Pool', ([owner, contributor]) => {
 
     it('should be possible to withdraw the contribution', async () => {
       const wethBalanceInitial = await weth.balanceOf(contributor)
-      await contributeEth()
-      const contributedAmount = await pool.contributorToken1Amount(contributor)
+      const tokenBalanceInitial = await token.balanceOf(contributor)
+      await contributeWethAndToken()
+      const contributedWethAmount = await pool.contributorToken1Amount(
+        contributor
+      )
+      const contributedTokenAmount = await pool.contributorToken2Amount(
+        contributor
+      )
       await pool.withdrawContribution({ from: contributor })
       const wethBalanceAfterWithdraw = await weth.balanceOf(contributor)
+      const tokenBalanceAfterWithdraw = await token.balanceOf(contributor)
       expect(
         wethBalanceAfterWithdraw.sub(wethBalanceInitial)
-      ).to.be.bignumber.eq(contributedAmount)
+      ).to.be.bignumber.eq(contributedWethAmount)
+      expect(
+        tokenBalanceAfterWithdraw.sub(tokenBalanceInitial)
+      ).to.be.bignumber.eq(contributedTokenAmount)
     })
   })
 

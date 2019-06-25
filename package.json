@@ -2,6 +2,10 @@
   "name": "poolx",
   "version": "1.0.0",
   "description": "",
+  "engines": {
+    "node": ">=10.0.0 <11.0.0",
+    "npm": ">=6.0.0 <7.0.0 "
+  },
   "main": "index.js",
   "scripts": {
     "test": "bash scripts/run_test.sh",

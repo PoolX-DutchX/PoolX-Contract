@@ -1,10 +1,10 @@
 pragma solidity ^0.5.2;
 
 import "./IEtherToken.sol";
-import "../node_modules/@gnosis.pm/dx-contracts/contracts/DutchExchange.sol";
-import "../node_modules/@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInterface.sol";
-import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+import "@gnosis.pm/dx-contracts/contracts/DutchExchange.sol";
+import "@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInterface.sol";
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
 /// @title Pooling mechanism for DutchX
 contract Pool {

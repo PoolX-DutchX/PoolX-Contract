@@ -10,7 +10,13 @@
   "scripts": {
     "test": "bash scripts/run_test.sh",
     "flat": "bash scripts/flatten.sh",
-    "remix": "bash scripts/flatten.sh && remixd -s ./flats"
+    "remix": "bash scripts/flatten.sh && remixd -s ./flats",
+    "trace": "MODE=trace truffle test",
+    "coverage": "npm run clean && MODE=coverage truffle test; istanbul report html && open-cli coverage/index.html",
+    "profile": "npm run clean && MODE=profile truffle test; istanbul report html && open-cli coverage/index.html",
+    "clean": "shx rm -rf coverage",
+    "sol-compiler": "sol-compiler",
+    "sol-compiler:watch": "sol-compiler -w"
   },
   "author": "",
   "license": "ISC",

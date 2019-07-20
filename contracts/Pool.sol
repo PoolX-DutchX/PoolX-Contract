@@ -311,7 +311,7 @@ contract Pool {
     function _collectFunds() private {
         // claim funds to pool
         dx.claimSellerFunds(address(token1), address(token2), address(this), 1);
-        newToken1Balance = dx.balances(address(token1),address(this));
+        newToken2Balance = dx.balances(address(token2),address(this));
 
         if (hasPostedBuyOrder) {
             dx.claimBuyerFunds(address(token1), address(token2), address(this), 1);

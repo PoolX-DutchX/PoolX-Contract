@@ -1,8 +1,8 @@
-const Pool = artifacts.require('./Pool.sol')
-const Token = artifacts.require('./TokenGNO.sol')
-const EtherToken = artifacts.require('./EtherToken.sol')
-const DutchExchangeProxy = artifacts.require('./DutchExchangeProxy.sol')
-const DutchExchange = artifacts.require('./DutchExchange.sol')
+const Pool = artifacts.require('Pool')
+const Token = artifacts.require('TokenGNO')
+const EtherToken = artifacts.require('EtherToken')
+const DutchExchangeProxy = artifacts.require('DutchExchangeProxy')
+const DutchExchange = artifacts.require('DutchExchange')
 
 const { duration } = require('./helpers/timer')
 const { ensuresException } = require('./helpers/exception')
@@ -15,7 +15,6 @@ contract('Pool', ([owner, contributor]) => {
   const initialClosingPriceNum = 2
   const initialClosingPriceDen = 1
   const oneEth = ether('1')
-  const twoTokens = ether('2')
   const twentyEth = ether('20')
   const fortyTokens = ether('40')
   const refundedTokens = new BN('1818181818181818180')
@@ -40,12 +39,14 @@ contract('Pool', ([owner, contributor]) => {
     await pool.contribute(oneEth, 0, { from: contributor })
   }
 
-  async function contributeWethAndToken() {
-    await weth.deposit({ from: contributor, value: oneEth })
-    await weth.approve(pool.address, oneEth, { from: contributor })
-    await token.transfer(contributor, twoTokens, { from: owner })
-    await token.approve(pool.address, twoTokens, { from: contributor })
-    await pool.contribute(oneEth, twoTokens, { from: contributor })
+  async function contributeWethAndToken(_contributor, wethAmount, tokenAmount) {
+    const wethInWei = ether(wethAmount)
+    const tokenInWei = ether(tokenAmount)
+    await weth.deposit({ from: _contributor, value: wethInWei })
+    await weth.approve(pool.address, wethInWei, { from: _contributor })
+    await token.transfer(_contributor, tokenInWei, { from: owner })
+    await token.approve(pool.address, tokenInWei, { from: _contributor })
+    await pool.contribute(wethInWei, tokenInWei, { from: _contributor })
   }
 
   async function getAuctionStart() {
@@ -140,7 +141,7 @@ contract('Pool', ([owner, contributor]) => {
     it('should be possible to withdraw the contribution', async () => {
       const wethBalanceInitial = await weth.balanceOf(contributor)
       const tokenBalanceInitial = await token.balanceOf(contributor)
-      await contributeWethAndToken()
+      await contributeWethAndToken(contributor, '1', '2')
       const contributedWethAmount = await pool.contributorToken1Amount(
         contributor
       )
@@ -254,5 +255,59 @@ contract('Pool', ([owner, contributor]) => {
         ensuresException(e)
       }
     })
+  })
+
+  it('received tokens should match conversion', async () => {
+    const contributor1WethTransfer = '10'
+    const contributor2TokenTransfer = '40'
+    const refundedTokens1 = '909090909090909090'
+    const refundedTokens2 = '1818181818181818180'
+    let contributor1WethBalance, contributor1TokenBalance,
+      contributor2WethBalance, contributor2TokenBalance
+
+    await contributeWethAndToken(contributor, contributor1WethTransfer, '0')
+    await contributeWethAndToken(contributor2, '0', contributor2TokenTransfer)
+    contributor1WethBalance = await weth.balanceOf(contributor)
+    expect(contributor1WethBalance).to.be.bignumber.eq(refundedTokens1)
+    contributor2TokenBalance = await token.balanceOf(contributor2)
+    expect(contributor2TokenBalance).to.be.bignumber.eq(refundedTokens2)
+
+    const auctionStart = await getAuctionStart()
+    await time.increaseTo(auctionStart + duration.hours(12))
+    await pool.buyAndCollect({ from: owner })
+
+    await time.increaseTo(auctionStart + duration.hours(25))
+    await pool.claimFunds({ from: contributor })
+    await pool.claimFunds({ from: contributor2 })
+
+    const closingPrice = await dutchX.closingPrices(
+      weth.address,
+      token.address,
+      1
+    )
+    const numerator = closingPrice.num
+    const denominator = closingPrice.den
+
+    contributor1WethBalance = await weth.balanceOf(contributor)
+    contributor1TokenBalance = await token.balanceOf(contributor)
+
+    const usedSellToken = ether(contributor1WethTransfer).sub(
+      contributor1WethBalance
+    )
+    const buyTokenFromSellToken = usedSellToken.mul(numerator).div(denominator)
+    const dxWethBalance = await weth.balanceOf(dutchX.address)
+    expect(buyTokenFromSellToken.sub(dxWethBalance)).to.be.bignumber.closeTo(
+      contributor1TokenBalance,
+      new BN('10000000000000')
+    )
+
+    contributor2WethBalance = await weth.balanceOf(contributor2)
+    contributor2TokenBalance = await token.balanceOf(contributor2)
+
+    const usedBuyToken = ether(contributor2TokenTransfer).sub(
+      contributor2TokenBalance
+    )
+    const sellTokenFromBuyToken = usedBuyToken.mul(denominator).div(numerator)
+    expect(sellTokenFromBuyToken).to.be.bignumber.eq(contributor2WethBalance)
   })
 })

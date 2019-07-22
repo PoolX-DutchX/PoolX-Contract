@@ -15,20 +15,20 @@ contract('Pool', ([owner, contributor]) => {
   const initialClosingPriceNum = 2
   const initialClosingPriceDen = 1
   const oneEth = ether('1')
-  const twentyEth = ether('20')
+  const tenEth = ether('10')
   const fortyTokens = ether('40')
   const refundedTokens = new BN('1818181818181818180')
 
   async function listToken() {
     // weth sell side
-    await weth.deposit({ from: contributor, value: twentyEth })
-    await weth.approve(pool.address, twentyEth, { from: contributor })
+    await weth.deposit({ from: contributor, value: tenEth })
+    await weth.approve(pool.address, tenEth, { from: contributor })
 
     // token buy side
     await token.transfer(contributor, fortyTokens, { from: owner })
     await token.approve(pool.address, fortyTokens, { from: contributor })
 
-    await pool.contribute(twentyEth, fortyTokens, {
+    await pool.contribute(tenEth, fortyTokens, {
       from: contributor,
     })
   }
@@ -261,7 +261,6 @@ contract('Pool', ([owner, contributor]) => {
     const contributor1WethTransfer = '10'
     const contributor2TokenTransfer = '40'
     const refundedTokens1 = '909090909090909090'
-    const refundedTokens2 = '1818181818181818180'
     let contributor1WethBalance, contributor1TokenBalance,
       contributor2WethBalance, contributor2TokenBalance
 
@@ -270,7 +269,7 @@ contract('Pool', ([owner, contributor]) => {
     contributor1WethBalance = await weth.balanceOf(contributor)
     expect(contributor1WethBalance).to.be.bignumber.eq(refundedTokens1)
     contributor2TokenBalance = await token.balanceOf(contributor2)
-    expect(contributor2TokenBalance).to.be.bignumber.eq(refundedTokens2)
+    expect(contributor2TokenBalance).to.be.bignumber.eq(refundedTokens)
 
     const auctionStart = await getAuctionStart()
     await time.increaseTo(auctionStart + duration.hours(12))

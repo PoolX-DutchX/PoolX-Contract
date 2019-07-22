@@ -9,8 +9,18 @@ const { ensuresException } = require('./helpers/exception')
 const { BN, ether, time } = require('openzeppelin-test-helpers')
 
 const { expect } = require('chai')
+const mode = process.env.MODE
 
-contract('Pool', ([owner, contributor]) => {
+contract('Pool', ([owner, contributor, contributor2]) => {
+
+  after('write coverage/profiler output', async () => {
+    if (mode === 'profile') {
+      await global.profilerSubprovider.writeProfilerOutputAsync()
+    } else if (mode === 'coverage') {
+      await global.coverageSubprovider.writeCoverageAsync()
+    }
+  })
+
   let pool, token, weth, dx, dutchX
   const initialClosingPriceNum = 2
   const initialClosingPriceDen = 1

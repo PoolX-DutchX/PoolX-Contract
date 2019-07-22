@@ -1,10 +1,10 @@
 pragma solidity ^0.5.2;
 
 import "./IEtherToken.sol";
-import "../node_modules/@gnosis.pm/dx-contracts/contracts/DutchExchange.sol";
-import "../node_modules/@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInterface.sol";
-import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+import "@gnosis.pm/dx-contracts/contracts/DutchExchange.sol";
+import "@gnosis.pm/dx-contracts/contracts/Oracle/PriceOracleInterface.sol";
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
 /// @title Pooling mechanism for DutchX
 contract Pool {
@@ -166,16 +166,11 @@ contract Pool {
             "Missing contributeToken2 funds for contract!"
         );
 
-        contributorToken1Amount[msg.sender]
-            = contributorToken1Amount[msg.sender].add(contributeToken1);
-        contributorToken2Amount[msg.sender]
-            = contributorToken2Amount[msg.sender].add(contributeToken2);
+        _addToken1(contributeToken1);
+        _addToken2(contributeToken2);
 
         emit Contribute(msg.sender, address(token1), contributeToken1);
         emit Contribute(msg.sender, address(token2), contributeToken2);
-
-        token1Balance = token1Balance.add(contributeToken1);
-        token2Balance = token2Balance.add(contributeToken2);
 
         if (_thresholdIsReached()) {
             _addTokenPair();
@@ -186,6 +181,9 @@ contract Pool {
         if (dx.getAuctionIndex(address(token1), address(token2)) == 1) {
             _buyTokens();
         }
+
+        leftOverBuyTokens = dx.balances(address(token2), address(this));
+        dx.withdraw(address(token2), leftOverBuyTokens);
 
         leftOverBuyTokens = token2.balanceOf(address(this));
 
@@ -245,9 +243,7 @@ contract Pool {
                 token1,
                 token1FundedValueUSD
             );
-
-            token1Balance = token1Balance.sub(refund);
-            contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].sub(refund);
+            _subtractToken1(refund);
         }
 
         // Halving token2FundedValueUSD as the token1 initial price
@@ -261,8 +257,7 @@ contract Pool {
                 halvedToken2FundedValueUSD
             );
 
-            token2Balance = token2Balance.sub(refund);
-            contributorToken2Amount[msg.sender] = contributorToken2Amount[msg.sender].sub(refund);
+            _subtractToken2(refund);
         }
 
         return token1ThresholdReached && token2ThresholdReached;
@@ -316,11 +311,11 @@ contract Pool {
     function _collectFunds() private {
         // claim funds to pool
         dx.claimSellerFunds(address(token1), address(token2), address(this), 1);
-        newToken1Balance = dx.balances(address(token1),address(this));
+        newToken2Balance = dx.balances(address(token2),address(this));
 
         if (hasPostedBuyOrder) {
             dx.claimBuyerFunds(address(token1), address(token2), address(this), 1);
-            newToken2Balance = dx.balances(address(token2),address(this));
+            newToken1Balance = dx.balances(address(token1), address(this));
         }
 
         require(
@@ -388,6 +383,36 @@ contract Pool {
         emit Claim(msg.sender, tokenShare);
     }
 
+    function _addToken1(uint256 amount) private {
+        contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].add(amount);
+        token1Balance = token1Balance.add(amount);
+    }
+
+    function _addToken2 (uint256 amount) private {
+        contributorToken2Amount[msg.sender] = contributorToken2Amount[msg.sender].add(amount);
+        token2Balance = token2Balance.add(amount);
+    }
+
+    function _subtractToken1(uint256 amount) private {
+        require(
+            //no need to check token1Balance - always > contributorToken1Amount[msg.sender]
+            contributorToken1Amount[msg.sender] >= amount,
+            "User has not enough token funds for subtraction!"
+        );
+        contributorToken1Amount[msg.sender] = contributorToken1Amount[msg.sender].sub(amount);
+        token1Balance = token1Balance.sub(amount);
+    }
+
+    function _subtractToken2(uint256 amount) private {
+        require(
+            //no need to check token2Balance - always > contributorToken2Amount[msg.sender]
+            contributorToken2Amount[msg.sender] >= amount,
+            "User has not enough token funds for subtraction!"
+        );
+        contributorToken2Amount[msg.sender] = contributorToken2Amount[msg.sender].sub(amount);
+        token2Balance = token2Balance.sub(amount);
+    }
+
     /// @dev contributors can withdraw their contribution
     function withdrawContribution() external atStage(Stages.Contribute) {
         uint256 token1Amount = contributorToken1Amount[msg.sender];
@@ -396,13 +421,13 @@ contract Pool {
         require(token1Amount > 0 || token2Amount > 0, 'No tokens contributed!');
 
         if (token1Amount > 0) {
-            token1Balance = token1Balance.sub(token1Amount);
             token1.transfer(msg.sender, token1Amount);
+            _subtractToken1(token1Amount);
         }
 
         if (token2Amount > 0) {
-            token2Balance = token2Balance.sub(token2Amount);
             token2.transfer(msg.sender, token2Amount);
+            _subtractToken2(token2Amount);
         }
 
         (uint256 token1FundedValueUSD, uint256 token2FundedValueUSD)

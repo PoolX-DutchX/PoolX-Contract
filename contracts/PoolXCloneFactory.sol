@@ -2,7 +2,7 @@ pragma solidity ^0.5.2;
 
 import "./Pool.sol";
 import "./CloneFactory.sol";
-import "../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
 /// @title Allows to create a new pool
 contract PoolXCloneFactory is Ownable, CloneFactory {
